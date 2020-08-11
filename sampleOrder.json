@@ -1,0 +1,232 @@
+{
+  "billing_info": {
+    "id": 0,
+    "address1": "string",
+    "address2": "string",
+    "business_name": "string",
+    "city": "string",
+    "country": "string",
+    "first_name": "string",
+    "last_name": "string",
+    "phone": "string",
+    "phone_ext": "string",
+    "postal_code": "string",
+    "state": "string"
+  },
+  "created": "2020-08-06T18:46:29.151Z",
+  "customer": {
+    "id": 0,
+    "company": {
+      "id": 0,
+      "business_name": "string",
+      "erp_code": "string"
+    },
+    "email": "user@example.com",
+    "first_name": "string",
+    "last_name": "string",
+    "phone": "string",
+    "phone_ext": "string"
+  },
+  "deliver_by": "2020-08-06T18:46:29.151Z",
+  "number": 47,
+  "order_items": [
+    {
+      "id": 0,
+      "components": [
+        {
+          "id": "string",
+          "child_ids": [
+            0
+          ],
+          "children": [
+            {
+              "child_id": 0,
+              "quantity": 0
+            }
+          ],
+          "deliver_quantity": 0,
+          "description": "string",
+          "export_controlled": true,
+          "finishes": [
+            "string"
+          ],
+          "innate_quantity": 0,
+          "is_root_component": true,
+          "make_quantity": 0,
+          "material": {
+            "id": 0,
+            "display_name": "string",
+            "family": "string",
+            "material_class": "string",
+            "name": "string"
+          },
+          "material_operations": [
+            {
+              "id": 0,
+              "category": "material",
+              "cost": 0,
+              "costing_variables": [
+                {
+                  "label": "string",
+                  "type": "string",
+                  "value": "string"
+                }
+              ],
+              "quantities": [
+                {
+                  "price": 0,
+                  "manual_price": 0,
+                  "lead_time": 0,
+                  "manual_lead_time": 0,
+                  "quantity": 0
+                }
+              ],
+              "is_finish": true,
+              "is_outside_service": true,
+              "name": "string",
+              "notes": "string",
+              "position": 0,
+              "runtime": 0,
+              "setup_time": 0
+            }
+          ],
+          "parent_ids": [
+            0
+          ],
+          "part_name": "string",
+          "part_number": "string",
+          "part_url": "string",
+          "part_uuid": "string",
+          "process": {
+            "id": 0,
+            "external_name": "string",
+            "name": "string"
+          },
+          "revision": "string",
+          "shop_operations": [
+            {
+              "id": 0,
+              "category": "material",
+              "cost": 0,
+              "costing_variables": [
+                {
+                  "label": "string",
+                  "type": "string",
+                  "value": "string"
+                }
+              ],
+              "quantities": [
+                {
+                  "price": 0,
+                  "manual_price": 0,
+                  "lead_time": 0,
+                  "manual_lead_time": 0,
+                  "quantity": 0
+                }
+              ],
+              "is_finish": true,
+              "is_outside_service": true,
+              "name": "string",
+              "notes": "string",
+              "position": 0,
+              "runtime": 0,
+              "setup_time": 0
+            }
+          ],
+          "supporting_files": [
+            {
+              "filename": "string",
+              "url": "string"
+            }
+          ],
+          "type": "assembled"
+        }
+      ],
+      "description": "string",
+      "expedite_revenue": 0,
+      "export_controlled": true,
+      "filename": "string",
+      "lead_days": 0,
+      "markup_1_price": 0,
+      "markup_1_name": "string",
+      "markup_2_price": 0,
+      "markup_2_name": "string",
+      "private_notes": "string",
+      "public_notes": "string",
+      "quantity": 0,
+      "quantity_outstanding": 0,
+      "quote_item_id": 0,
+      "quote_item_type": "automatic",
+      "root_component_id": 0,
+      "ships_on": "2020-08-06",
+      "total_price": 0,
+      "unit_price": 0,
+      "base_price": 0,
+      "add_on_fees": 0,
+      "ordered_add_ons": [
+        {
+          "is_required": true,
+          "name": "string",
+          "price": 0,
+          "quantity": 0
+        }
+      ]
+    }
+  ],
+  "payment_details": {
+    "card_brand": "string",
+    "card_last4": "string",
+    "net_payout": 0,
+    "payment_type": "credit_card",
+    "purchase_order_number": "string",
+    "purchasing_dept_contact_email": "user@example.com",
+    "purchasing_dept_contact_name": "string",
+    "shipping_cost": 0,
+    "subtotal": 0,
+    "tax_cost": 0,
+    "tax_rate": 0,
+    "payment_terms": "string",
+    "total_price": 0
+  },
+  "private_notes": "string",
+  "quote_number": 0,
+  "quote_revision_number": 0,
+  "shipments": [
+    {
+      "id": 0,
+      "pickup_recipient": "string",
+      "shipment_date": "2020-08-06T18:46:29.151Z",
+      "shipment_items": [
+        {
+          "id": 0,
+          "order_item_id": 0,
+          "quantity": 0
+        }
+      ],
+      "shipping_cost": 0,
+      "tracking_number": "string"
+    }
+  ],
+  "shipping_info": {
+    "id": 0,
+    "address1": "string",
+    "address2": "string",
+    "business_name": "string",
+    "city": "string",
+    "country": "string",
+    "first_name": "string",
+    "last_name": "string",
+    "phone": "string",
+    "phone_ext": "string",
+    "postal_code": "string",
+    "state": "string"
+  },
+  "shipping_option": {
+    "customers_account_number": "string",
+    "customers_carrier": "ups",
+    "shipping_method": "early_am_overnight",
+    "type": "pickup"
+  },
+  "ships_on": "2020-08-06",
+  "status": "pending"
+}
