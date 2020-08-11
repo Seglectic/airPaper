@@ -38,8 +38,8 @@ if(fs.existsSync('airtableKey')){                                               
   console.error("Airtable key not found! './airtableKey'")
   return;
 }
-
 /* ------------------------------------------------------------------------------------ */
+
 
 
 /***************************************
@@ -93,7 +93,6 @@ function getNewWOs(){
         }
         
         paperData.forEach(WO => {                            // For every new order, do a thing with it
-          // getThumbs(WO)                                      // Retrieve thumbnail URLs first before getting WO data
           getWO(WO); 
           latestWO++;
         });
@@ -192,15 +191,13 @@ function sendAirtableObject(WO,paperData){
     }
 
     //If Material specified, slap it on
-    if(paperData.order_items[i].components[0].material_operations[0]){
-      var material = paperData.order_items[i].components[0].material_operations[0].name
+    if(paperData.order_items[i].components[i].material_operations[i]){
+      var material = paperData.order_items[i].components[i].material_operations[i].name
     }
-
     
     if(material){
       WObject.fields.Material = material;
     }
-
   
     base('Work Orders').create([
       WObject
@@ -214,10 +211,8 @@ function sendAirtableObject(WO,paperData){
         console.log(`New entry: ${record.fields.Part} ( ${record.getId()} ) added.`); 
         // console.log(getThumb(WO,0))
       });
-
     });
   }
-
 }
 
 console.log("AirPaper is now running");
