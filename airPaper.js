@@ -8,17 +8,21 @@
           // ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
     
            
-const extract     = require('extract-zip');
-const fs          = require('fs');
-const https       = require('https');
-const Airtable    = require('airtable');
+// const extract     = require('extract-zip');    // Required for extracting images from Paperless
+const fs          = require('fs');                // File System I/O
+const https       = require('https');             // Allows get requests to paperless API
+const Airtable    = require('airtable');          // Airtable API library
+const moment      = require('moment');            // Formatted time stamps
 
 
+/* ------------------------------------ Global Vars ----------------------------------- */
+var Version        = 0.9;                         // Current Version
+var updateInterval = 120000;                      // How often to check new orders (in ms)
+var activeBase     = "Paperless Work Orders"                // Production: "Work Orders" | Testing: "Paperless Work Orders"
 
 /* ---------------------------- Airtable & Paperless Config --------------------------- */
 
 var latestWO = 0;                                                                     // File to hold most recent known paperless ID
-
 if(fs.existsSync('latestWO')){                                                        // Check for latestWO file and load data 
   var latestWOfile = fs.readFileSync('latestWO',"UTF8");
   latestWO = Number(latestWOfile);
@@ -32,26 +36,36 @@ if(fs.existsSync('paperlessKey')){                                              
 }
 
 if(fs.existsSync('airtableKey')){                                                     // Check for Paperless Parts key file and load data 
-  var airtableKey   = fs.readFileSync("airtableKey","UTF8");                    
-  var base          = new Airtable({apiKey: airtableKey}).base('appjwkCHzyCIMJagA');  // Configure base object to post data with base ID (P3D ERP)
+  var airtableKey   = fs.readFileSync("airtableKey","UTF8");                          // Configure base object to post data with base ID (P3D ERP)
+  var base          = new Airtable({apiKey: airtableKey}).base('appjwkCHzyCIMJagA');  
+  
 }else{
   console.error("Airtable key not found! './airtableKey'")
   return;
 }
-/* ------------------------------------------------------------------------------------ */
 
 
+/* -------------------------------- Shorthand Functions ------------------------------- */
 
-/***************************************
- * 
- *   //SECTION getNewWOs()
- * 
- *  Checks for existence of new orders 
- *  and runs getWO() for each new found.
- * 
- ***************************************/
-function getNewWOs(){
-  console.log("Checking for new orders...")
+// ╭────────────────────────────────────────────────╮
+// │  Log text to terminal with timestamp prefixed  │
+// ╰────────────────────────────────────────────────╯
+function timeLog(text){
+  var tS = moment().format('Do MMM, h:mm:ss a');
+  console.log(`「${tS}」 ${text}` )
+}
+
+
+/* -------------------------------- airPaper Callbacks -------------------------------- */
+
+  // ╭────────────────────────────────────────╮
+  // │   //SECTION getNewWOs()                │
+  // │                                        │
+  // │  Checks for existence of new orders    │
+  // │  and runs getWO() for each new found.  │
+  // ╰────────────────────────────────────────╯
+
+  function getNewWOs(){
 
   if(latestWO<1){latestWO=''}
 
@@ -61,7 +75,7 @@ function getNewWOs(){
     "url": `https://api.paperlessparts.com/orders/public/new?last_order=${latestWO}`,
   }
 
-  https.get(options.url,options,(res)=>{
+  https.get(options.url,options,(res)=>{                    // Make Request
     const { statusCode } = res;
     const contentType = res.headers['content-type'];
     let error; // Check for errors & reports it
@@ -73,22 +87,20 @@ function getNewWOs(){
       return;
     }
     
-    res.setEncoding('utf8');                                //Get and parse data  
+    res.setEncoding('utf8');                              
     let rawData = '';
     res.on('data', (data) => { rawData += data; });
     res.on('end', () => {
       try {
-        var paperData = JSON.parse(rawData);
-          
-        switch (Object.keys(paperData).length) {            //Report how many new orders
+        var paperData = JSON.parse(rawData);                // Set parse http data into paperData
+        switch (Object.keys(paperData).length) {            // Report how many new orders
           case 0:
-            //console.log("None new.");
             break;
           case 1:
-            console.log("One new order!");
+            timeLog("One new order!");
             break;
           default:
-            console.log(`${Object.keys(paperData).length} new orders!`)
+            timeLog(`${Object.keys(paperData).length} new orders!`)
             break;
         }
         
@@ -98,26 +110,25 @@ function getNewWOs(){
         });
 
         fs.writeFileSync('latestWO',latestWO.toString());    //Save latest WO# to file
-
       } catch (e) {
         console.error(e.message);
       }
     });
-  }).on('error', (e) => {console.error(`Error occurred: ${e.message}`);});
+  }).on('error', (e) => {console.error(`Error retrieving new orders: ${e.message}`);});
 }
 //!SECTION
 
-                 
+         
 
-/***************************************
- * 
- *               getWO()
- * 
- *  Fetches a Work Order of given # and
- *  runs sendAirTableObject with 
- *  returned data
- * 
- ***************************************/
+
+ // ╭───────────────────────────────────────╮
+ // │     //SECTION getWO()                 │
+ // │                                       │
+ // │  Fetches a Work Order of given # and  │
+ // │  runs sendAirTableObject with         │
+ // │  returned data                        │
+ // ╰───────────────────────────────────────╯
+
 function getWO(num){
   var options = {
     "headers": { "Authorization": `API-Token ${paperlessKey}`},
@@ -145,7 +156,8 @@ function getWO(num){
     res.on('end', () => {
       try {
         var paperData = JSON.parse(rawData);
-        sendAirtableObject(num,paperData);
+        // sendAirtableObject(num,paperData);
+        createWO(num,paperData);
       } catch (e) {
         console.error(e.message);
       }
@@ -153,68 +165,69 @@ function getWO(num){
     });
   }).on('error', (e) => {console.error(`Error occurred: ${e.message}`);});
 }
+// !SECTION
 
 
 
 
-/***************************************
- * 
- *         sendAirtableObject()
- * 
- *  Creates object to send to Airtable
- *  from Paperless JSON data
- * 
- ***************************************/
-function sendAirtableObject(WO,paperData){
+// ╭─────────────────────────────────────────╮
+// │          //SECTION createWO()           │
+// │                                         │
+// │    Creates object with work order data  │
+// │   to be sent to Airtable as a new item  │
+// ╰─────────────────────────────────────────╯
+function createWO(WO,paperData){
 
-  for (let i = 0; i < paperData.order_items.length; i++) {
-
-    var name = paperData.order_items[i].filename.split('.').slice(0, -1).join('.')
-
-    //Work Order Object to populate for AirTable:
+    //Iterate through all actual parts in the order
+    paperData.order_items.forEach(orderItem => {
     var WObject = {
       "fields": {
         'Paperless Entry #':Number(WO),
-        'Paperless ID#':Number(paperData.order_items[i].id),
-        'Part':name,
+        'Paperless ID#':Number(orderItem.id),
+        'Part':orderItem.filename.split('.').slice(0, -1).join('.'),
         'Status': "PO Received",
-        'Qty Ordered':Number(paperData.order_items[i].quantity),
+        'Qty Ordered':Number(orderItem.quantity),
         'Due Date': paperData.ships_on, 
-        'Client': `${paperData.customer.first_name} ${paperData.customer.last_name}`, 
+        'Client': paperData.customer.company ? paperData.customer.company.business_name : `${paperData.customer.first_name} ${paperData.customer.last_name}`, 
         'Purchase Orders': paperData.payment_details.purchase_order_number,
         'Notes': paperData.private_notes,
-        'Finish':paperData.order_items[i].finishes,
-        'PP Part Link':'https://app.paperlessparts.com/parts/viewer/'+paperData.order_items[i].components[i].part_uuid,
         'Stock Status':'Not Yet Ordered',
         'Tooling Status': 'Not Yet Ordered',
       }
     }
 
-    //If Material specified, slap it on
-    if(paperData.order_items[i].components[i].material_operations[i]){
-      var material = paperData.order_items[i].components[i].material_operations[i].name
-    }
-    
-    if(material){
-      WObject.fields.Material = material;
-    }
-  
-    base('Work Orders').create([
-      WObject
-    ], function(err, records) {
-      if (err) {
-        console.error(err);
-        return;
-      }
-
-      records.forEach(function (record) {
-        console.log(`New entry: ${record.fields.Part} ( ${record.getId()} ) added.`); 
-        // console.log(getThumb(WO,0))
-      });
+    //Iterate 'components' subsection for each part
+    orderItem.components.forEach(comp => {
+      WObject.fields['Finish']       ? comp.finishes[0] : "";
+      WObject.fields['Material']     ? comp.material.name : "";
+      WObject.fields['PP Part Link'] = `https://app.paperlessparts.com/parts/viewer/${comp.part_uuid}`;
+      WObject.fields['STEP File']    = comp.part_url;
     });
-  }
-}
 
-console.log("AirPaper is now running");
+    console.log(WObject);
+  });
+}
+//!SECTION
+
+
+
+
+ // ╭──────────────────────────────────────╮
+ // │   //SECTION sendAirtableObject()     │
+ // │                                      │
+ // │  Sends created objects into airtable │
+ // │  at 'activeBase'                     │
+ // ╰──────────────────────────────────────╯
+function sendAirtableObject(WObject){
+    base(activeBase).create([WObject], (err, records)=>{
+      if (err) {console.error(err);return;}
+      records.forEach(function (record) {timeLog(`New entry: ${record.fields.Part} ( ${record.getId()} ) added.`);});
+    });
+}
+//!SECTION
+
+/* -------------------------------------- Execute ------------------------------------- */
+
+timeLog(`AirPaper ${Version}`)
 getNewWOs();
-setInterval(getNewWOs,120000) //Run every x ms
+// setInterval(getNewWOs,updateInterval) //Run every x ms`

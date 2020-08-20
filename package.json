@@ -6,7 +6,8 @@
   "dependencies": {
     "airtable": "^0.8.1",
     "extract-zip": "^2.0.1",
-    "pngjs": "^5.0.0"
+    "pngjs": "^5.0.0",
+    "moment": "*"
   },
   "devDependencies": {},
   "scripts": {
