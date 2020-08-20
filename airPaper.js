@@ -18,7 +18,7 @@ const moment      = require('moment');            // Formatted time stamps
 /* ------------------------------------ Global Vars ----------------------------------- */
 var Version        = 0.9;                         // Current Version
 var updateInterval = 120000;                      // How often to check new orders (in ms)
-var activeBase     = "Paperless Work Orders"                // Production: "Work Orders" | Testing: "Paperless Work Orders"
+var activeBase     = "Work Orders"                // Production: "Work Orders" | Testing: "Paperless Work Orders"
 
 /* ---------------------------- Airtable & Paperless Config --------------------------- */
 
@@ -177,35 +177,37 @@ function getWO(num){
 // │   to be sent to Airtable as a new item  │
 // ╰─────────────────────────────────────────╯
 function createWO(WO,paperData){
-
     //Iterate through all actual parts in the order
+    console.log(paperData)
     paperData.order_items.forEach(orderItem => {
     var WObject = {
       "fields": {
-        'Paperless Entry #':Number(WO),
-        'Paperless ID#':Number(orderItem.id),
-        'Part':orderItem.filename.split('.').slice(0, -1).join('.'),
-        'Status': "PO Received",
-        'Qty Ordered':Number(orderItem.quantity),
-        'Due Date': paperData.ships_on, 
-        'Client': paperData.customer.company ? paperData.customer.company.business_name : `${paperData.customer.first_name} ${paperData.customer.last_name}`, 
-        'Purchase Orders': paperData.payment_details.purchase_order_number,
-        'Notes': paperData.private_notes,
-        'Stock Status':'Not Yet Ordered',
-        'Tooling Status': 'Not Yet Ordered',
+        "Paperless Entry #":Number(WO),
+        "Paperless ID#":Number(orderItem.id),
+        "Part":orderItem.filename.split('.').slice(0, -1).join('.'),
+        "Status": "PO Received",
+        "Qty Ordered":Number(orderItem.quantity),
+        "Due Date": paperData.ships_on, 
+        "Client": paperData.customer.company ? paperData.customer.company.business_name : `${paperData.customer.first_name} ${paperData.customer.last_name}`, 
+        "Purchase Orders": paperData.payment_details.purchase_order_number,
+        "Notes": paperData.private_notes,
+        "Stock Status":'Not Yet Ordered',
+        "Tooling Status": 'Not Yet Ordered',
       }
     }
 
     //Iterate 'components' subsection for each part
     orderItem.components.forEach(comp => {
-      WObject.fields['Finish']       ? comp.finishes[0] : "";
-      WObject.fields['Material']     ? comp.material.name : "";
-      WObject.fields['PP Part Link'] = `https://app.paperlessparts.com/parts/viewer/${comp.part_uuid}`;
-      WObject.fields['STEP File']    = comp.part_url;
+      WObject.fields["Finish"]       = comp.finishes[0] ? comp.finishes[0] : "";
+      WObject.fields["Material"]     = comp.material.name ? comp.material.name : "";
+      WObject.fields["PP Part Link"] = `https://app.paperlessparts.com/parts/viewer/${comp.part_uuid}`;
+      WObject.fields["STEP File"]    = comp.part_url;
     });
 
-    console.log(WObject);
+    sendAirtableObject(WObject);
+    // console.log(WObject);
   });
+
 }
 //!SECTION
 
@@ -221,7 +223,9 @@ function createWO(WO,paperData){
 function sendAirtableObject(WObject){
     base(activeBase).create([WObject], (err, records)=>{
       if (err) {console.error(err);return;}
-      records.forEach(function (record) {timeLog(`New entry: ${record.fields.Part} ( ${record.getId()} ) added.`);});
+      records.forEach(function (record) {
+        timeLog(`New entry: ${record.fields.Part} ( ${record.getId()} ) added.`);
+      });
     });
 }
 //!SECTION
@@ -230,4 +234,4 @@ function sendAirtableObject(WObject){
 
 timeLog(`AirPaper ${Version}`)
 getNewWOs();
-// setInterval(getNewWOs,updateInterval) //Run every x ms`
+setInterval(getNewWOs,updateInterval) //Run every x ms`
