@@ -8,7 +8,6 @@
           // ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
     
            
-// const extract     = require('extract-zip');    // Required for extracting images from Paperless
 const fs          = require('fs');                // File System I/O
 const https       = require('https');             // Allows get requests to paperless API
 const Airtable    = require('airtable');          // Airtable API library
@@ -95,7 +94,6 @@ function webGet(options,callback){
   // ╰────────────────────────────────────────╯
 
   function getNewWOs(){
-
   var options = {
     "headers": { "Authorization": `API-Token ${paperlessKey}`},
     "method": "GET",
@@ -113,8 +111,8 @@ function webGet(options,callback){
         timePrint(`${Object.keys(paperData).length} new orders!`)
         break;
     }
-    
-    paperData.forEach(WO => {                                       // For every new order, do a thing with it
+
+    paperData.forEach(WO => {                                       //Get WO for each discovered
       getWO(WO); 
       latestWO++;
     });
@@ -142,10 +140,8 @@ function webGet(options,callback){
     "method": "GET",
     "url": `https://api.paperlessparts.com/orders/public/${num}`,
   }
-
   webGet(options,createWO);
 }
-
 // !SECTION
 
 
@@ -174,7 +170,6 @@ function createWO(paperData){
         "Tooling Status": 'Not Yet Ordered',
       }
     }
-
     //Iterate 'components' subsection for each part
     orderItem.components.forEach(comp => {
       WObject.fields["Finish"]       = comp.finishes[0] ? comp.finishes[0] : "";
@@ -213,4 +208,4 @@ function sendAirtableObject(WObject){
 
 timePrint(`AirPaper ${Version}`)
 getNewWOs();
-// setInterval(getNewWOs,updateInterval) //Run every x ms`
+setInterval(getNewWOs,updateInterval) //Run every x ms`
