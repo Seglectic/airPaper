@@ -58,10 +58,11 @@ if(fs.existsSync('airtableKey')){
 
 var express = require('express');
 var app = express();
-var httPort = 8080;
+var httPort = 8085;
 var serveDir = './imgServe'
 app.use(express.static(__dirname + '/imgServe'));
 var server = app.listen(httPort,function(){console.log('Server started on port',httPort);});
+var getURL = 'http://108.189.199.31'
 
 /* -------------------------------- Shorthand Functions ------------------------------- */
 
@@ -109,6 +110,7 @@ const imgDownload = (url, path, callback) => {
       .on('close', ()=>{gunzip(path, path+'.png', ()=>{fs.unlinkSync(path), callback} )})
   })
 }
+
 
 
 /* -------------------------------- airPaper Callbacks -------------------------------- */
@@ -205,14 +207,13 @@ function createWO(paperData){
       WObject.fields["Material"]     = comp.material.name ? comp.material.name : "";
       WObject.fields["PP Part Link"] = `https://app.paperlessparts.com/parts/viewer/${comp.part_uuid}`;
       WObject.fields["STEP File"]    = comp.part_url;
-      WObject.fields["Picture"].push({url:"http://108.189.199.31:8080/"+WObject.fields["Part"]+'.png'});
-      thumbURL=comp.thumbnail_url;
+      WObject.fields["Picture"].push({url:`${getURL}:${httPort}/`+WObject.fields["Part"]+'.png'});
+      thumbURL=comp.thumbnail_url;   //Grab the Thumbnail URL for later usage
 
     });
 
-    //Download thumbnail
-    imgDownload(thumbURL,'./imgServe/'+WObject.fields["Part"], sendAirtableObject(WObject))
-    // sendAirtableObject(WObject)
+    //Download thumbnail from URL and send
+    imgDownload(thumbURL,'./imgServe/'+WObject.fields["Part"].replace(/[&\/\\#,+()$~%.'":*?<>{}]/g, ''), sendAirtableObject(WObject));
 
 
     
