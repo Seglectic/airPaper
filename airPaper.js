@@ -20,7 +20,7 @@ const gunzip      = require('gunzip-file');       // Extractor for gzip'd thumbn
 var Version        = 1.0;                         // Current Version
 var updateInterval = 120000;                      // How often to check new orders (in ms)
 var activeBase     = "Paperless Work Orders"                // Production: "Work Orders" | Testing: "Paperless Work Orders"
-var debug          = true                        // Freeze latestWO
+var debug          = false                        // Freeze latestWO
 
 /* ---------------------------- Airtable & Paperless Config --------------------------- */
 
@@ -106,7 +106,7 @@ const imgDownload = (url, path, callback) => {
   request.head(url, (err, res, body) => {
       request(url)
       .pipe(fs.createWriteStream(path))
-      .on('close', ()=>{gunzip(path, path+'.png', ()=>{fs.unlinkSync(path)}, callback )})
+      .on('close', ()=>{gunzip(path, path+'.png', ()=>{fs.unlinkSync(path), callback} )})
   })
 }
 
