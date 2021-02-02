@@ -12,18 +12,20 @@ const fs          = require('fs');                // File System I/O
 const https       = require('https');             // Allows get requests to paperless API
 const Airtable    = require('airtable');          // Airtable API library
 const moment      = require('moment');            // Formatted time stamps
+const request     = require('request');           // Make http requests for thumbnail data
+const gunzip      = require('gunzip-file');       // Extractor for gzip'd thumbnails
 
 
 /* ------------------------------------ Global Vars ----------------------------------- */
 var Version        = 1.0;                         // Current Version
 var updateInterval = 120000;                      // How often to check new orders (in ms)
-var activeBase     = "Work Orders"                // Production: "Work Orders" | Testing: "Paperless Work Orders"
-var debug          = false                        // Freeze latestWO
+var activeBase     = "Paperless Work Orders"                // Production: "Work Orders" | Testing: "Paperless Work Orders"
+var debug          = true                        // Freeze latestWO
 
 /* ---------------------------- Airtable & Paperless Config --------------------------- */
 
 // File to hold most recent known paperless ID
-var latestWO = 0;                                                                     
+var latestWO = 80;     
 if(fs.existsSync('latestWO')){                                                        
   var latestWOfile = fs.readFileSync('latestWO',"UTF8");
   latestWO = Number(latestWOfile);
@@ -46,6 +48,20 @@ if(fs.existsSync('airtableKey')){
   return;
 }
 
+
+/* ---------------------------------- Express Server ---------------------------------- */
+
+// ┌─────────────────────────────────────────────────────┐
+// │  Begin express server for hosting image files       │
+// │   (Required for thumbnails to be sent to airTable)  │
+// └─────────────────────────────────────────────────────┘
+
+var express = require('express');
+var app = express();
+var httPort = 8080;
+var serveDir = './imgServe'
+app.use(express.static(__dirname + '/imgServe'));
+var server = app.listen(httPort,function(){console.log('Server started on port',httPort);});
 
 /* -------------------------------- Shorthand Functions ------------------------------- */
 
@@ -81,6 +97,17 @@ function webGet(options,callback){
       callback(JSON.parse(rawData))
     })
   }).on('error', (e) => {console.error(`HTTP Error: ${e.message}`);});
+}
+
+// ┌─────────────────────────────────────────────────────────────┐
+// │  Downloads image to path and runs callback upon completion  │
+// └─────────────────────────────────────────────────────────────┘
+const imgDownload = (url, path, callback) => {
+  request.head(url, (err, res, body) => {
+      request(url)
+      .pipe(fs.createWriteStream(path))
+      .on('close', ()=>{gunzip(path, path+'.png', ()=>{fs.unlinkSync(path)}, callback )})
+  })
 }
 
 
@@ -168,17 +195,27 @@ function createWO(paperData){
         "Notes": paperData.private_notes,
         "Stock Status":'Not Yet Ordered',
         "Tooling Status": 'Not Yet Ordered',
+        "Picture":[],
       }
     }
+    var thumbURL;
     //Iterate 'components' subsection for each part
     orderItem.components.forEach(comp => {
       WObject.fields["Finish"]       = comp.finishes[0] ? comp.finishes[0] : "";
       WObject.fields["Material"]     = comp.material.name ? comp.material.name : "";
       WObject.fields["PP Part Link"] = `https://app.paperlessparts.com/parts/viewer/${comp.part_uuid}`;
       WObject.fields["STEP File"]    = comp.part_url;
+      WObject.fields["Picture"].push({url:"http://108.189.199.31:8080/"+WObject.fields["Part"]+'.png'});
+      thumbURL=comp.thumbnail_url;
+
     });
 
-    sendAirtableObject(WObject);
+    //Download thumbnail
+    imgDownload(thumbURL,'./imgServe/'+WObject.fields["Part"], sendAirtableObject(WObject))
+    // sendAirtableObject(WObject)
+
+
+    
     // console.log(WObject);
   });
 

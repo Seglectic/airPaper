@@ -107,5 +107,6 @@ airtableKey
 notes.txt
 paperlessKey
 latestWO
-imgurTokens.txt
 sampleOrder.json
+imgurSecret
+imageDownloader.js

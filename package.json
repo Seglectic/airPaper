@@ -5,9 +5,11 @@
   "main": "airPaper.js",
   "dependencies": {
     "airtable": "^0.8.1",
+    "express": "^4.17.1",
+    "follow-redirects": "^1.13.2",
+    "gunzip-file": "^0.1.1",
     "moment": "*"
   },
-  "devDependencies": {},
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
