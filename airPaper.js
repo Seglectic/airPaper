@@ -22,8 +22,8 @@ var updateInterval = 120000;                      // How often to check new orde
 var activeBase     = "Work Orders";               // Production: "Work Orders" | Testing: "Paperless Work Orders"
 var debug          = false;                       // Freeze latestWO
 var httPort        = 8085;                        // Port to host HTTP server from
-var getURL = 'http://108.189.199.31'              // Local external IP for airtable to request web data
-var serveDir = './imgServe'                       // Local directory to host images
+var getURL         = 'http://108.189.199.31'      // Local external IP for airtable to request web data
+var serveDir       = './imgServe'                 // Local directory to host images
 
 /* ---------------------------- Airtable & Paperless Config --------------------------- */
 
