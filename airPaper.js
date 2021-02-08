@@ -19,8 +19,11 @@ const gunzip      = require('gunzip-file');       // Extractor for gzip'd thumbn
 /* ------------------------------------ Global Vars ----------------------------------- */
 var Version        = 1.0;                         // Current Version
 var updateInterval = 120000;                      // How often to check new orders (in ms)
-var activeBase     = "Paperless Work Orders"                // Production: "Work Orders" | Testing: "Paperless Work Orders"
-var debug          = false                        // Freeze latestWO
+var activeBase     = "Work Orders";               // Production: "Work Orders" | Testing: "Paperless Work Orders"
+var debug          = false;                       // Freeze latestWO
+var httPort        = 8085;                        // Port to host HTTP server from
+var getURL = 'http://108.189.199.31'              // Local external IP for airtable to request web data
+var serveDir = './imgServe'                       // Local directory to host images
 
 /* ---------------------------- Airtable & Paperless Config --------------------------- */
 
@@ -58,11 +61,8 @@ if(fs.existsSync('airtableKey')){
 
 var express = require('express');
 var app = express();
-var httPort = 8085;
-var serveDir = './imgServe'
-app.use(express.static(__dirname + '/imgServe'));
+app.use(express.static(__dirname + serveDir));
 var server = app.listen(httPort,function(){console.log('Server started on port',httPort);});
-var getURL = 'http://108.189.199.31'
 
 /* -------------------------------- Shorthand Functions ------------------------------- */
 
@@ -213,7 +213,7 @@ function createWO(paperData){
     });
 
     //Download thumbnail from URL and send
-    imgDownload(thumbURL,'./imgServe/'+WObject.fields["Part"].replace(/[&\/\\#,+()$~%.'":*?<>{}]/g, ''), sendAirtableObject(WObject));
+    imgDownload(thumbURL,'./imgServe/'+WObject.fields["Part"].replace(/[ &\/\\#,+()$~%.'":*?<>{}]/g, ''), sendAirtableObject(WObject));
 
 
     
