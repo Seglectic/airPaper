@@ -11,18 +11,21 @@ const zlib = require('zlib');          // Extractor for gzip'd thumbnails
 const Airtable = require('airtable');  // Airtable API library
 const moment = require('moment');      // Formatted time stamps
 const followHttps = require('follow-redirects').https;
+require('dotenv').config();
 
 // ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 // │                                                    Global Vars                                                    │
 // └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
 var Version = "1.2.0";                     // Current Version
-var updateInterval = 120000;               // How often to check new orders (in ms)
-// var activeBase = "Work Orders";            // Uncomment for Production: "Work Orders"
-var activeBase = "Paperless Work Orders";  // Uncomment for Testing:    "Paperless Work Orders"
-var debug = true;                          // Freeze latestWO
-var airtableBaseID = "appjwkCHzyCIMJagA";
-var attachmentField = "Picture";
+var updateInterval = Number(process.env.UPDATE_INTERVAL || 120000);          // How often to check new orders (in ms)
+var activeBase = process.env.ACTIVE_TABLE || "Work Orders";                  // Airtable table name
+var debug = process.env.DEBUG === "true";                                    // Freeze latestWO
+var airtableBaseID = process.env.AIRTABLE_BASE_ID || "appjwkCHzyCIMJagA";
+
+// Airtable attachment uploads need the field name in the URL. Keeping this as a var makes it easier to reuse
+// if other attachment fields, like STEP files, get uploaded the same way later.
+var pictureField = "Picture";
 
 // ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 // │                                            Airtable & Paperless Config                                            │
@@ -35,25 +38,32 @@ if (fs.existsSync('latestWO')) {
   latestWO = Number(latestWOfile);
 }
 
-// Check for Paperless Parts key file and load data
-if (fs.existsSync('paperlessKey')) {
-  var paperlessKey = fs.readFileSync('paperlessKey', "UTF8");
-} else {
-  console.error("Paperless Parts key not found! './paperlessKey'")
+var paperlessKey = process.env.PAPERLESS_KEY;
+var airtableKey = process.env.AIRTABLE_KEY;
+
+// Fall back to the old key files if .env has not been set up yet.
+if (!paperlessKey && fs.existsSync('paperlessKey')) {
+  paperlessKey = fs.readFileSync('paperlessKey', "UTF8");
+}
+
+if (!airtableKey && fs.existsSync('airtableKey')) {
+  airtableKey = fs.readFileSync("airtableKey", "UTF8");
+}
+
+if (!paperlessKey) {
+  console.error("Paperless Parts key not found! Set PAPERLESS_KEY in .env or create './paperlessKey'")
   return;
 }
 
-// Check for Paperless Parts key file and load data
-if (fs.existsSync('airtableKey')) {
-  var airtableKey = fs.readFileSync("airtableKey", "UTF8");
-  var base = new Airtable({ apiKey: airtableKey }).base(airtableBaseID);
-} else {
-  console.error("Airtable key not found! './airtableKey'")
+if (!airtableKey) {
+  console.error("Airtable key not found! Set AIRTABLE_KEY in .env or create './airtableKey'")
   return;
 }
+
+var base = new Airtable({ apiKey: airtableKey.trim() }).base(airtableBaseID);
 
 // ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-// │                                                Shorthand Functions                                                │
+// │                                             Helper & Mapping Functions                                            │
 // └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
 // ╭────────────────────────────────────────────────╮
@@ -100,6 +110,36 @@ function cleanFileName(fileName) {
   return fileName.replace(/[ &\/\\#,+()$~%.'":*?<>{}]/g, '') || 'part';
 }
 
+function clientName(customer) {
+  return customer.company ? customer.company.business_name : `${customer.first_name} ${customer.last_name}`;
+}
+
+// ╭────────────────────────────────────────────────────────╮
+// │  Maps one Paperless order item into the field object   │
+// │  Airtable expects when creating a Work Order record.   │
+// ╰────────────────────────────────────────────────────────╯
+function workOrderObject(paperData, orderItem, comp) {
+  return {
+    "fields": {
+      "Paperless ID#": Number(orderItem.id),
+      "Part": orderItem.filename.split('.').slice(0, -1).join('.'),
+      "Status": "PO Received",
+      "Qty Ordered": Number(orderItem.quantity),
+      "Due Date": paperData.ships_on,
+      "Client": clientName(paperData.customer),
+      "Purchase Order": paperData.payment_details.purchase_order_number,
+      "Notes": paperData.private_notes,
+      "Stock Status": "Not Yet Ordered",
+      "Tooling Status": "Not Yet Ordered",
+      [pictureField]: [],
+      "Finish": comp.finishes[0] ? comp.finishes[0] : "",
+      "Material": comp.material.name ? comp.material.name : "",
+      "PP Part Link": `https://app.paperlessparts.com/parts/viewer/${comp.part_uuid}`,
+      "STEP File": comp.part_url,
+    }
+  }
+}
+
 // ╭──────────────────────────────────────────────╮
 // │  Download a file into memory. Paperless      │
 // │  thumbnail URLs may redirect, so use the     │
@@ -126,12 +166,14 @@ function downloadBuffer(url, callback) {
 }
 
 function gunzipIfNeeded(buffer, callback) {
+  // Paperless thumbnails have historically arrived gzip-compressed. If this one is not gzip, keep the original bytes.
   zlib.gunzip(buffer, (err, unzipped) => {
     callback(null, err ? buffer : unzipped);
   });
 }
 
 function loadAttachmentBuffer(attachment, callback) {
+  // Attachments can come from either a remote Paperless URL or a local placeholder file such as ITAR.png.
   if (attachment.path) {
     fs.readFile(attachment.path, callback);
     return;
@@ -173,7 +215,7 @@ function uploadAirtableAttachment(recordId, attachment) {
     let options = {
       "hostname": "content.airtable.com",
       "method": "POST",
-      "path": `/v0/${airtableBaseID}/${recordId}/${attachmentField}/uploadAttachment`,
+      "path": `/v0/${airtableBaseID}/${recordId}/${pictureField}/uploadAttachment`,
       "headers": {
         "Authorization": `Bearer ${airtableKey.trim()}`,
         "Content-Type": "application/json",
@@ -208,8 +250,11 @@ function uploadAirtableAttachment(recordId, attachment) {
 }
 
 // ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-// │                                                airPaper Callbacks                                                 │
+// │                                                airPaper Workflow                                                  │
 // └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+// Flow: poll Paperless for new order numbers, fetch each order, map each ordered part into an Airtable record,
+// create that record, then upload its picture attachment after Airtable returns the new record ID.
 
 // ╭────────────────────────────────────────╮
 // │   //SECTION getNewWOs()                │
@@ -273,28 +318,10 @@ function getWO(num) {
 // ╰─────────────────────────────────────────╯
 function createWO(paperData) {
   paperData.order_items.forEach(orderItem => {                                                                                                                // Iterate through all actual parts in the order (Since orders can have multiple parts)
-    var WObject = {                                                                                                                                           // Create the Work Order object we'll send to Airtable to make a record
-      "fields": {                                                                                                                                             // Create the fields object
-        "Paperless ID#": Number(orderItem.id),                                                                                                                // Add the Paperless ID# to the 'Paperless ID#' field
-        "Part": orderItem.filename.split('.').slice(0, -1).join('.'),                                                                                         // Use the filename as the part name (remove the file extension)
-        "Status": "PO Received",                                                                                                                              // Default to 'PO Received' for status
-        "Qty Ordered": Number(orderItem.quantity),                                                                                                            // Add the quantity to the 'Qty Ordered' field
-        "Due Date": paperData.ships_on,                                                                                                                       // Use the 'ships_on' date as the due date
-        "Client": paperData.customer.company ? paperData.customer.company.business_name : `${paperData.customer.first_name} ${paperData.customer.last_name}`, // If the customer has a company, use it, otherwise use their name
-        "Purchase Order": paperData.payment_details.purchase_order_number,                                                                                    // Add the PO number to the 'Purchase Order' field
-        "Notes": paperData.private_notes,                                                                                                                     // Add private notes to the 'Notes' field
-        "Stock Status": 'Not Yet Ordered',                                                                                                                    // Default to 'Not Yet Ordered' for stock status
-        "Tooling Status": 'Not Yet Ordered',                                                                                                                  // Default to 'Not Yet Ordered' for tooling status
-        "Picture": [],                                                                                                                                        // Array for pictures
-      }
-    }
-
     let comp = orderItem.components[0]; // Grab the first 'component' for the part (parts can be assemblies of multiple components)
-    WObject.fields["Finish"] = comp.finishes[0] ? comp.finishes[0] : "";
-    WObject.fields["Material"] = comp.material.name ? comp.material.name : "";
-    WObject.fields["PP Part Link"] = `https://app.paperlessparts.com/parts/viewer/${comp.part_uuid}`;
-    WObject.fields["STEP File"] = comp.part_url;
+    var WObject = workOrderObject(paperData, orderItem, comp);
 
+    // Airtable creates the record first; the direct attachment API uploads the image afterward using that record ID.
     let attachment = null;
     let ITAR = orderItem.export_controlled;
     if (ITAR && fs.existsSync('./imgServe/ITAR.png')) {
@@ -329,7 +356,7 @@ function sendAirtableObject(WObject, attachment) {
       return;
     }
     records.forEach(function (record) {
-      timePrint(`New entry: ${record.fields.Part} ( ${record.getId()} ) added.`);
+      timePrint(`New entry: ${record.fields["Part"]} ( ${record.getId()} ) added.`);
       if (attachment) {
         uploadAirtableAttachment(record.getId(), attachment);
       }
