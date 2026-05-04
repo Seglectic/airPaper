@@ -1,0 +1,3889 @@
+openapi: "3.0.2"
+
+info:
+  title: "Paperless Parts API"
+  description: "
+The Paperless Parts API provides access to your data, enabling developers to easily integrate Paperless Parts with third-party systems, such as Customer Relationship Management (CRM) and Enterprise Resource Planning (ERP) tools. The API is designed to support two primary use case. First, reading all information associated with a particular order or quote for import into another system. Second, managing customer data, either for an initial bulk import or for on-going synchronization with an external database.
+
+## Authorization ##
+
+Requests are authorized via an API key. Administrators of a Paperless Parts account can generate an API Token which grants access to all of the endpoints documented here. The token obtained from the application must be added to the header of all requests using the key `\"Authorization\"` with the value `\"API-Token <api_token>\"`, where `<api_token>` is your Paperless Parts API Token.
+
+
+You can use the \"Execute\" button in an endpoint's documentation on this page to try out the endpoint. This will send a request to the endpoint on the Paperless Parts server and display the result on this page. Before doing so, however, you'll need to click on the 'Authorize' button at the top of the screen, and in the \"Value\" field enter `\"API-Token <api_token>\"`, where `<api_token>` is your API token as described above.
+
+
+## Overview ##
+
+The API endpoints are organized around REST. API calls should be made to the `https://api.paperlessparts.com` base domain. URLs are designed to clearly describe an entity or collection of entities. HTTP verbs typically describe whether entities are being read, created, modified, or deleted. Where applicable, request and response bodies are in JSON format. Standard HTTP response codes, in addition to error messages, are used to help explain request failures.
+
+### Associations
+
+Many entities in the API data model are associated with other entities. As a guiding principle, `GET` requests that fetch data nest associated entities in the JSON response. However, when creating or modifying entities, a flat (non-nested) object must be provided, as explained in the documentation for each endpoint. Associations are specified when writing data by using entity IDs in fields ending in `_id`.
+
+
+For example, consider the relationship where a Company has many Customers. When fetching a Customer via a `GET` request, the associated Company will be nested as an object with key `company` in the response. When creating a Customer, the Company is specified via its integer id using the key `company_id`.
+
+### HTTP Methods
+
+The API endpoints support different HTTP methods depending on whether records are being read, created, or updated. To read an entity, use `GET`. To create a new entity, use `POST`. To modifying an entity, use `PATCH`. Note, `PATCH` is used rather than `PUT` to indicate that entities can be partially updated. In other words, in general, if a field is omitted from a `PATCH` request, that field's value will stay the same (rather than be set to `null`). All fields requiring values are required to be included in `POST` requests.
+
+> Note: Endpoints with a documented `PATCH` method can generally be used with a `PUT` method. The `PUT` is implemented as a partial update (as opposed to a replacement) and is supported for maximum compatibilty.
+
+
+For example, consider the `email` field on the Customer entity, which is required. All Customers must have a non-null `email`. When creating a Customer via `POST`, the request body must contain an `email` key and its value cannot be `null` (other validation applies to that field, as well, including a valid email format and a unique value). When editing a Customer via `PATCH` request, it is not necessary to include an `email` key in the request body. If `email` is omitted, the existing email address will not be changed. If you send a `PATCH` request with `email=null`, then you will receive an error response indicating that a value for `email` is required."
+  version: "1.0"
+  termsOfService: "https://www.paperlessparts.com/web-service-agreement/"
+  contact:
+    name: "Paperless Parts"
+    url: "https://www.paperlessparts.com"
+    email: "support@paperlessparts.com"
+
+security:
+  - app_id: []
+
+servers:
+  - url: "https://api.paperlessparts.com/"
+
+tags:
+  - name: Orders
+    description: Endpoints for identifying newly placed orders and pulling all information related to a particular order. Also, a new order can be created via open API to turn an existing quote into order.
+  - name: Quotes
+    description: Endpoints for identifying newly sent quotes, pulling all information related to a particular quote, and updating a quote's status.
+  - name: Customers
+    description: "
+Paperless Parts includes Customer Relationship Management (CRM) functionality to make it easy to send quotes to new and existing customers, while keeping data consistent with third-party CRM and ERP systems. Typical use cases for these endpoints are to bulk import customers from an existing customer database and to synchronize new customers or changes from another system.
+
+
+An account represents a single company or account to which you would send quotes. An account has zero or more Contacts, each of which represents a person at that company and is identified uniquely by their email address. An account also has facilities and billing addresses. Facilities represent destinations to which orders can be shipped and BillingAddresses represent the bill to address for and order."
+  - name: Custom Tables
+    description: Endpoints for managing custom tables used by Operations to compute pricing.
+  - name: Purchased Components
+    description: Endpoints for managing purchased components and purchased components columns.
+  - name: Integration Actions
+    description: Endpoints for interacting with ERP integrations 
+paths:
+  /quotes/public/new:
+    get:
+      summary: "List new quote numbers and revisions"
+      description: "List the numbers and revisions of new quotes that have been sent. If the number and (optional) revision of the last known sent quote is supplied, this endpoint will return a list of the numbers and revisions of the quotes sent after the specified quote. If no number is provided, this endpoint will return a list of the numbers and revisions of all sent quotes. Note that the quote numbers will be returned in the order the quotes were sent, not necessarily in ascending numerical order."
+      operationId: 'NewQuoteNumbers'
+      parameters:
+        - $ref: '#/components/parameters/last_quote'
+        - $ref: '#/components/parameters/revision'
+      tags:
+        - Quotes
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuoteNumberArray'
+        404:
+          description: Not found response
+          content:
+            text/plain:
+              schema:
+                title: Quote not found
+                type: string
+                example: "Error: Not Found"
+
+
+
+  /quotes/public/{quoteNumber}:
+    get:
+      summary: "Get quote details"
+      description: "Get the details for a specific quote."
+      operationId: 'QuoteDetails'
+      parameters:
+        - $ref: '#/components/parameters/quoteNumber'
+        - $ref: '#/components/parameters/revisionNumber'
+      tags:
+        - Quotes
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quote'
+        404:
+          description: Not found response
+          content:
+            text/plain:
+              schema:
+                title: Quote not found
+                type: string
+                example: "Error: Not Found"
+    patch:
+      summary: "Update fields on a Quote"
+      description: "Update fields on a Quote."
+      operationId: 'UpdateQuote'
+      parameters:
+        - $ref: '#/components/parameters/quoteNumber'
+        - $ref: '#/components/parameters/revisionNumber'
+      tags:
+        - Quotes
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quote'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                erp_code:
+                  type: string
+                  nullable: true
+                  description: The unique identifier of the corresponding quote record in the ERP system, cast to a string.
+                  example: "1234"
+  /quotes/public/{quoteNumber}/status_change:
+    patch:
+      summary: "Update a quote's status"
+      description: "Update a specific quote's status."
+      operationId: 'SetQuoteStatus'
+      parameters:
+        - $ref: '#/components/parameters/quoteNumber'
+        - $ref: '#/components/parameters/revisionNumber'
+      tags:
+        - Quotes
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quote'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  nullable: true
+                  description: the status of the quote. Available statuses are "oustanding", "cancelled", "lost", and "trash"
+                  example: "outstanding"
+
+
+
+  /orders/public/new:
+    get:
+      summary: "List new order numbers"
+      description: "List the numbers of new orders that have been created. If the number of the last known order is supplied, this endpoint will return a list of the numbers of the orders created after the specified order. If no number is provided, this endpoint will return a list of all available order numbers."
+      operationId: 'NewOrderNumbers'
+      parameters:
+        - $ref: '#/components/parameters/last_order'
+      tags:
+        - Orders
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderNumberArray'
+        404:
+          description: Not found response
+          content:
+            text/plain:
+              schema:
+                title: Order not found
+                type: string
+                example: "Error: Not Found"
+
+  /orders/public/{orderNumber}:
+    get:
+      summary: "Get order details"
+      description: "Get the details for a specific order."
+      operationId: 'OrderDetails'
+      parameters:
+        - $ref: '#/components/parameters/orderNumber'
+      tags:
+        - Orders
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        404:
+          description: Not found response
+          content:
+            text/plain:
+              schema:
+                title: Quote not found
+                type: string
+                example: "Error: Not Found"
+    patch:
+      summary: "Update fields on an Order"
+      description: "Update fields on an Order."
+      operationId: 'UpdateOrder'
+      parameters:
+        - $ref: '#/components/parameters/orderNumber'
+      tags:
+        - Orders
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                erp_code:
+                  type: string
+                  nullable: true
+                  description: The unique identifier of the corresponding order record in the ERP system, cast to a string.
+                  example: "1234"
+
+  /orders/public/facilitate_order:
+    post:
+      summary: "Create an order from a quote"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FacilitateOrderBody'
+      tags:
+        - Orders
+      responses:
+        200:
+          description: Successful response
+
+        404:
+          description: Not found response
+
+
+  /contacts/public:
+    get:
+      summary: List contacts
+      description:
+        "Returns a list of contacts. The contacts are returned 20 results at a time and can be iterated over by using the page parameter."
+      operationId: ListContacts
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+          required: False
+          description: "Value used to search against the following fields: email, first name, last name, notes, phone, and account_id. Comparisons are not case sensitive and will match when the field value includes the search value as a substring."
+        - in: query
+          name: page
+          schema:
+            type: string
+          required: False
+          description: "The page of results to return."
+        - in: query
+          name: account_id
+          schema:
+            type: integer
+          required: false
+          description: The id of the account who's contacts to return. Must be an exact match.
+          example: 17'
+      tags:
+        - Customers
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    account_id:
+                      type: integer
+                      example: 17
+                      nullable: true
+                      description: the ID of the associated Account
+                    created:
+                      type: string
+                      example: "2020-08-25T18:00:53+00:00"
+                    email:
+                      type: string
+                      example: careers@paperlessparts.com
+                      description: email address (must be non-null, unique across all Contacts, and a valid email format)
+                    first_name:
+                      type: string
+                      example: Gordon
+                      description: Contact first name (must be non-null)
+                    id:
+                      type: integer
+                      example: 137
+                    last_name:
+                      type: string
+                      example: Moore
+                      description: Contact last name (must be non-null)
+                    phone:
+                      type: string
+                      nullable: true
+                      example: "6176354500"
+                      description: Contact phone number
+                    phone_ext:
+                      type: string
+                      nullable: true
+                      example: null
+                      description: Contact phone number extension
+        404:
+          description: Not found response
+          content:
+            text/plain:
+              schema:
+                title: Customers not found
+                type: string
+                example: "Error: Not Found"
+    post:
+      summary: Create new contact
+      description: Creates a new contact.
+      operationId: CreateContact
+      tags:
+        - Customers
+      responses:
+        201:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contact'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                account_id:
+                  type: integer
+                  nullable: true
+                  description: the ID of the associated Account
+                  example: 137
+                address:
+                  type: object
+                  description: the contact's address
+                  nullable: true
+                  properties:
+                    address1:
+                      type: string
+                      nullable: false
+                      description: The street address
+                      example: 137 Portland St.
+                    address2:
+                      type: string
+                      nullable: true
+                      description: Unit #
+                      example: Unit 1
+                    city:
+                      type: string
+                      nullable: false
+                      description: The city of the address
+                      example: Boston
+                    country:
+                      type: string
+                      nullable: false
+                      description: The three character country abbreviation
+                      example: USA
+                    postal_code:
+                      type: string
+                      nullable: false
+                      description: The postal code for the address
+                      example: "02114"
+                    state:
+                      type: string
+                      nullable: false
+                      description: The two character state abbreviation
+                      example: MA
+                email:
+                  type: string
+                  nullable: false
+                  description: email address (must be non-null, unique across all Contacts, and a valid email format)
+                  example: careers@paperlessparts.com
+                first_name:
+                  type: string
+                  nullable: false
+                  description: Contact first name (must be non-null)
+                  example: Gordon
+                last_name:
+                  type: string
+                  nullable: false
+                  description: Contact last name (must be non-null)
+                  example: Moore
+                notes:
+                  type: string
+                  nullable: true
+                  description: Contact notes
+                phone:
+                  type: string
+                  nullable: true
+                  example: "6176354500"
+                  description: Customer phone number
+                phone_ext:
+                  type: string
+                  nullable: true
+                  example: null
+                  description: Customer phone number extension
+                salesperson:
+                  type: object
+                  description: the contacts salesperson
+                  nullable: true
+                  properties:
+                    email:
+                      type: string
+                      nullable: false
+                      description: The salespersons email address. Must correspond to an active team member in your Paperless Parts account.
+                      example: "careers@paperlessparts.com"
+
+
+  /contacts/public/{contactId}:
+    get:
+      summary: Get details about a Contact
+      description: Get all Contact attributes
+      operationId: ContactDetails
+      parameters:
+        - $ref: '#/components/parameters/contactId'
+      tags:
+        - Customers
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contact'
+    patch:
+      summary: Update a Contact
+      description: Partially update Contact attributes (not including associated entities)
+      operationId: UpdateCustomer
+      parameters:
+        - $ref: '#/components/parameters/contactId'
+      tags:
+        - Customers
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contact'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                account_id:
+                  type: integer
+                  nullable: true
+                  description: the ID of the associated Account
+                  example: 137
+                address:
+                  type: object
+                  description: The contact's address. If an address exists on a customer then individual fields can be patched, otherwise all fields are required
+                  nullable: true
+                  properties:
+                    address1:
+                      type: string
+                      nullable: false
+                      description: The street address
+                      example: 137 Portland St.
+                    address2:
+                      type: string
+                      nullable: true
+                      description: Unit #
+                      example: Unit 1
+                    city:
+                      type: string
+                      nullable: false
+                      description: The city of the address
+                      example: Boston
+                    country:
+                      type: string
+                      nullable: false
+                      description: The three character country abbreviation
+                      example: USA
+                    postal_code:
+                      type: string
+                      nullable: false
+                      description: The postal code for the address
+                      example: "02114"
+                    state:
+                      type: string
+                      nullable: false
+                      description: The two character state abbreviation
+                      example: MA
+                email:
+                  type: string
+                  nullable: false
+                  description: email address (must be non-null, unique across all Contacts, and a valid email format)
+                  example: careers@paperlessparts.com
+                first_name:
+                  type: string
+                  nullable: false
+                  description: Contact first name (must be non-null)
+                  example: Gordon
+                last_name:
+                  type: string
+                  nullable: false
+                  description: Contact last name (must be non-null)
+                  example: Moore
+                notes:
+                  type: string
+                  nullable: true
+                  description: Contact notes
+                phone:
+                  type: string
+                  nullable: true
+                  example: "6176354500"
+                  description: Customer phone number
+                phone_ext:
+                  type: string
+                  nullable: true
+                  example: null
+                  description: Customer phone number extension
+                salesperson:
+                  type: object
+                  description: the contacts salesperson
+                  nullable: true
+                  properties:
+                    email:
+                      type: string
+                      nullable: false
+                      description: The salespersons email address. Must correspond to an active team member in your Paperless Parts account.
+                      example: "careers@paperlessparts.com"
+            example:
+              phone: "6176354500"
+
+  /accounts/public:
+    get:
+      summary: List accounts
+      description: "Returns a list of accounts. The accounts are returned 20 results at a time and can be iterated over by using the page parameter."
+      operationId: ListAccounts
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+          required: False
+          description: "Value used to search against the following fields: account name, erp code, notes, and id. Comparisons are not case sensitive and will match when the field value includes the search value as a substring."
+        - in: query
+          name: page
+          schema:
+            type: string
+          required: False
+          description: "The page of results to return."
+        - in: query
+          name: erp_code
+          schema:
+            type: string
+          required: False
+          description: The erp code of the accounts to return. Must be an exact match.
+          example: 'PPI'
+        - in: query
+          name: null_erp_code
+          schema:
+            type: boolean
+          required: False
+          description: Filters for accounts whose erp code is either null or an empty string.
+          example: True
+      tags:
+        - Customers
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                      example: Paperless Parts, Inc.
+                      description: The name of the account
+                    erp_code:
+                      type: string
+                      example: PPI
+                      description: The ERP code of the account
+                    id:
+                      type: integer
+                      example: 17
+                      description: the ID of the account
+                    phone:
+                      type: string
+                      example: "6176354500"
+                      description: Account phone number
+                    phone_ext:
+                      type: string
+                      example: null
+                      description: Account phone number extension
+                    type:
+                      type: string
+                      example: customer
+                      description: Account type, either customer or vendor
+        404:
+          description: Not found response
+          content:
+            text/plain:
+              schema:
+                title: Accounts not found
+                type: string
+                example: "Error: Not Found"
+    post:
+      summary: Create new Account
+      description: Creates a new account.
+      operationId: CreateAccoumt
+      tags:
+        - Customers
+      responses:
+        201:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  nullable: false
+                  description: (Required) Account Name (must be non-null and non-blank)
+                  example: Paperless Parts, Inc.
+                credit_line:
+                  type: number
+                  nullable: True
+                  description: An account's credit line
+                  example: 10000.00
+                erp_code:
+                  type: string
+                  nullable: True
+                  description: Erp code for the account
+                  example: PPI
+                notes:
+                  type: string
+                  nullable: true
+                  description: Account notes
+                payment_terms:
+                  type: string
+                  nullable: true
+                  description: Payment terms; required if `payment_terms_period` are included
+                  example: "Net 30"
+                payment_terms_period:
+                  type: string
+                  nullable: true
+                  description: Payment terms period in days; required if `payment_terms` are included, but can be `null`
+                  example: 30
+                phone:
+                  type: string
+                  nullable: true
+                  example: "6176354500"
+                  description: Account phone number
+                phone_ext:
+                  type: string
+                  nullable: true
+                  example: null
+                  description: Account phone number extension
+                purchase_orders_enabled:
+                  type: boolean
+                  example: true
+                  nullable: false
+                  description: When `true` any contact associated with this account will be allowed to check out with a purchase order.
+                salesperson:
+                  type: object
+                  description: the accounts salesperson
+                  nullable: true
+                  properties:
+                    email:
+                      type: string
+                      nullable: false
+                      description: The salespersons email address. Must correspond to an active team member in your Paperless Parts account.
+                      example: "careers@paperlessparts.com"
+                sold_to_address:
+                  type: object
+                  description: The address for the account's headquarters.
+                  nullable: true
+                  properties:
+                    address1:
+                      type: string
+                      nullable: false
+                      description: The street address
+                      example: 137 Portland St.
+                    address2:
+                      type: string
+                      nullable: true
+                      description: Unit #
+                      example: Unit 1
+                    city:
+                      type: string
+                      nullable: false
+                      description: The city of the address
+                      example: Boston
+                    country:
+                      type: string
+                      nullable: false
+                      description: The three character country abbreviation
+                      example: USA
+                    postal_code:
+                      type: string
+                      nullable: false
+                      description: The postal code for the address
+                      example: "02114"
+                    state:
+                      type: string
+                      nullable: false
+                      description: The two character state abbreviation
+                      example: MA
+                    erp_code:
+                      type: string
+                      maxLength: 50
+                      description: The unique identifier for this address record in the ERP
+                      example: B1234
+                tax_exempt:
+                  type: boolean
+                  nullable: false
+                  example: true
+                  description: When `true`, sales tax will not be added to a quote
+                tax_rate:
+                  type: number
+                  nullable: true
+                  example: 6.25
+                  description: Sales tax rate for this Account
+                type:
+                  type: string
+                  nullable: false
+                  example: customer
+                  description: Type of this Account, either customer or vendor
+                url:
+                  type: string
+                  nullable: true
+                  example: https://paperlessparts.com
+            example:
+              credit_line: 100000
+              erp_code: "PPI"
+              purchase_orders_enabled: true
+              name: "Paperless Parts, Inc."
+              notes: "This is a test account"
+              tax_exempt: true
+              tax_rate: 6.25
+              phone: "6175555555"
+              url: "www.paperlessparts.com"
+              type: "customer"
+
+  /accounts/public/{accountId}:
+    get:
+      summary: Get details about an Account
+      description: Get all Account attributes, including a list of billing addresses.
+      operationId: AccountDetails
+      parameters:
+        - $ref: '#/components/parameters/accountId'
+      tags:
+        - Customers
+      responses:
+        200:
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        404:
+          description: Not found response
+          content:
+            text/plain:
+              schema:
+                title: Account not found
+                type: string
+                example: "Error: Not Found"
+    patch:
+      summary: Update an Account
+      description: Partially update Account attributes (not including associated entities)
+      operationId: UpdateCompany
+      parameters:
+        - $ref: '#/components/parameters/accountId'
+      tags:
+        - Customers
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  nullable: false
+                  description: (Required) Account Name (must be non-null and non-blank)
+                  example: Paperless Parts, Inc.
+                credit_line:
+                  type: number
+                  nullable: True
+                  description: An account's credit line
+                  example: 10000.00
+                erp_code:
+                  type: string
+                  nullable: True
+                  description: Erp code for the account
+                  example: PPI
+                notes:
+                  type: string
+                  nullable: true
+                  description: Account notes
+                payment_terms:
+                  type: string
+                  nullable: true
+                  description: Payment terms; required if `payment_terms_period` are included
+                  example: "Net 30"
+                payment_terms_period:
+                  type: string
+                  nullable: true
+                  description: Payment terms period in days; required if `payment_terms` are included, but can be `null`
+                  example: 30
+                phone:
+                  type: string
+                  nullable: true
+                  example: "6176354500"
+                  description: Account phone number
+                phone_ext:
+                  type: string
+                  nullable: true
+                  example: null
+                  description: Account phone number extension
+                purchase_orders_enabled:
+                  type: boolean
+                  example: true
+                  nullable: false
+                  description: When `true` any contact associated with this account will be allowed to check out with a purchase order.
+                salesperson:
+                  type: object
+                  description: the accounts salesperson
+                  nullable: true
+                  properties:
+                    email:
+                      type: string
+                      nullable: false
+                      description: The salespersons email address. Must correspond to an active team member in your Paperless Parts account.
+                      example: "careers@paperlessparts.com"
+                sold_to_address:
+                  type: object
+                  description: The address for the account's headquarters. If a sold_to_address is present on the account then individual fields can be patched otherwise all fields are required.
+                  nullable: true
+                  properties:
+                    address1:
+                      type: string
+                      nullable: false
+                      description: The street address
+                      example: 137 Portland St.
+                    address2:
+                      type: string
+                      nullable: true
+                      description: Unit #
+                      example: Unit 1
+                    city:
+                      type: string
+                      nullable: false
+                      description: The city of the address
+                      example: Boston
+                    country:
+                      type: string
+                      nullable: false
+                      description: The three character country abbreviation
+                      example: USA
+                    postal_code:
+                      type: string
+                      nullable: false
+                      description: The postal code for the address
+                      example: "02114"
+                    state:
+                      type: string
+                      nullable: false
+                      description: The two character state abbreviation
+                      example: MA
+                    erp_code:
+                      type: string
+                      maxLength: 50
+                      description: The unique identifier for this address record in the ERP
+                      example: B1234
+                tax_exempt:
+                  type: boolean
+                  nullable: false
+                  example: true
+                  description: When `true`, sales tax will not be added to a quote
+                tax_rate:
+                  type: number
+                  nullable: true
+                  example: 6.25
+                  description: Sales tax rate for this Account
+                type:
+                  type: string
+                  nullable: false
+                  example: customer
+                  description: Type of this Account, either customer or vendor
+                url:
+                  type: string
+                  nullable: true
+                  example: https://paperlessparts.comA
+            example:
+              erp_code: "PPI"
+              name: "Paperless Parts, Inc."
+              url: "www.paperlessparts.com"
+
+
+  /accounts/public/{accountId}/billing_addresses:
+    get:
+      summary: List account billing addresses
+      description: List all billing addresses associated with an account
+      operationId: ListBillingAddresses
+      parameters:
+        - $ref: '#/components/parameters/accountId'
+      tags:
+        - Customers
+      responses:
+        200:
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Address'
+        404:
+          description: Not found response
+          content:
+            text/plain:
+              schema:
+                title: Account not found
+                type: string
+                example: "Error: Not Found"
+    post:
+      summary: "Create a new billing address for an account"
+      operationId: CreateBillingAddress
+      parameters:
+        - $ref: '#/components/parameters/accountId'
+      tags:
+        - Customers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Address'
+      responses:
+        201:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddressInfo'
+
+  /accounts/public/{accountId}/facilities:
+    get:
+      summary: List account facilites
+      description: List all facilities associated with an account
+      operationId: ListFacilities
+      parameters:
+        - $ref: '#/components/parameters/accountId'
+      tags:
+        - Customers
+      responses:
+        200:
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Facility'
+        404:
+          description: Not found response
+          content:
+            text/plain:
+              schema:
+                title: Account not found
+                type: string
+                example: "Error: Not Found"
+    post:
+      summary: "Create a new facility for an account"
+      operationId: CreateFacility
+      parameters:
+        - $ref: '#/components/parameters/accountId'
+      tags:
+        - Customers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  nullable: true
+                  description: Name of Facility
+                  example: Boston Office
+                attention:
+                  type: string
+                  nullable: true
+                  description: The person or department to ship packages to at the facility
+                address:
+                  type: object
+                  description: The address of the facility.
+                  nullable: true
+                  properties:
+                    address1:
+                      type: string
+                      nullable: false
+                      description: The street address
+                      example: 137 Portland St.
+                    address2:
+                      type: string
+                      nullable: true
+                      description: Unit #
+                      example: Unit 1
+                    city:
+                      type: string
+                      nullable: false
+                      description: The city of the address
+                      example: Boston
+                    country:
+                      type: string
+                      nullable: false
+                      description: The three character country abbreviation
+                      example: USA
+                    postal_code:
+                      type: string
+                      nullable: false
+                      description: The postal code for the address
+                      example: "02114"
+                    state:
+                      type: string
+                      nullable: false
+                      description: The two character state abbreviation
+                      example: MA
+                    erp_code:
+                      type: string
+                      maxLength: 50
+                      nullable: false
+                      description: The unique identifier for this address record in the ERP
+                      example: B1234
+                salesperson:
+                  type: object
+                  description: the contacts salesperson
+                  nullable: true
+                  properties:
+                    email:
+                      type: string
+                      nullable: false
+                      description: The salespersons email address. Must correspond to an active team member in your Paperless Parts account.
+                      example: "careers@paperlessparts.com"
+      responses:
+        201:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Facility'
+
+  /billing_addresses/public/{billingAddressId}:
+    get:
+      summary: Get Billing Address
+      description: Get a sepecific billing address
+      operationId: BillingAddress
+      parameters:
+        - $ref: '#/components/parameters/billingAddressId'
+      tags:
+        - Customers
+      responses:
+        200:
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Address'
+        404:
+          description: Not found response
+          content:
+            text/plain:
+              schema:
+                title: Billing Address not found
+                type: string
+                example: "Error: Not Found"
+    patch:
+      summary: Update a Billing Address
+      description: Partially update a Billing Address
+      operationId: UpdateBillingAddress
+      parameters:
+        - $ref: '#/components/parameters/billingAddressId'
+      tags:
+        - Customers
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                address1:
+                  type: string
+                  nullable: false
+                  description: The street address
+                  example: 137 Portland St.
+                address2:
+                  type: string
+                  nullable: true
+                  description: Unit #
+                  example: Unit 1
+                city:
+                  type: string
+                  nullable: false
+                  description: The city of the address
+                  example: Boston
+                country:
+                  type: string
+                  nullable: false
+                  description: The three character country abbreviation
+                  example: USA
+                postal_code:
+                  type: string
+                  nullable: false
+                  description: The postal code for the address
+                  example: "02114"
+                state:
+                  type: string
+                  nullable: false
+                  description: The two character state abbreviation
+                  example: MA
+                erp_code:
+                  type: string
+                  maxLength: 50
+                  nullable: false
+                  description: The unique identifier for this address record in the ERP
+                  example: B1234
+            example:
+              address2: Basement
+
+  /facilities/public/{facilityId}:
+    get:
+      summary: Get A Facility
+      description: Get a sepecific facility
+      operationId: Facility
+      parameters:
+        - $ref: '#/components/parameters/facilityId'
+      tags:
+        - Customers
+      responses:
+        200:
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Facility'
+        404:
+          description: Not found response
+          content:
+            text/plain:
+              schema:
+                title: Facility not found
+                type: string
+                example: "Error: Not Found"
+    patch:
+      summary: Update a Facility
+      description: Partially update a Facility
+      operationId: UpdateFacility
+      parameters:
+        - $ref: '#/components/parameters/facilityId'
+      tags:
+        - Customers
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Facility'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                address:
+                  type: object
+                  properties:
+                    address1:
+                      type: string
+                      nullable: false
+                      description: The street address
+                      example: 137 Portland St.
+                    address2:
+                      type: string
+                      nullable: true
+                      description: Unit #
+                      example: Unit 1
+                    city:
+                      type: string
+                      nullable: false
+                      description: The city of the address
+                      example: Boston
+                    country:
+                      type: string
+                      nullable: false
+                      description: The three character country abbreviation
+                      example: USA
+                    postal_code:
+                      type: string
+                      nullable: false
+                      description: The postal code for the address
+                      example: "02114"
+                    state:
+                      type: string
+                      nullable: false
+                      description: The two character state abbreviation
+                      example: MA
+                    erp_code:
+                      type: string
+                      maxLength: 50
+                      nullable: false
+                      description: The unique identifier for this address record in the ERP
+                      example: B1234
+                attention:
+                  type: string
+                  nullable: false
+                  description: The person or department to ship packages to at the facility
+                  example: Gordon Moore
+                name:
+                  type: string
+                  nullable: false
+                  description: The name of the facility
+                  example: Boston HQ
+                salesperson:
+                  type: object
+                  description: the contacts salesperson
+                  nullable: true
+                  properties:
+                    email:
+                      type: string
+                      nullable: false
+                      description: The salespersons email address. Must correspond to an active team member in your Paperless Parts account.
+                      example: "careers@paperlessparts.com"
+            example:
+              address2: Basement
+  /customers/public/payment_terms:
+    get:
+      summary: Returns a list of payment terms
+      description: "Returns a list of payment terms available to be used for accounts."
+      operationId: ListPaymentTerms
+      tags:
+        - Customers
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 26198
+                      description: the ID of the payment terms
+                    label:
+                      type: string
+                      example: "Net 30 days"
+                      description: the label for the payment terms
+                    period:
+                      type: integer
+                      example: 30
+                      description: number of days before payment is due
+        404:
+          description: Not found response
+          content:
+            text/plain:
+              schema:
+                title: Payment terms not found
+                type: string
+                example: "Error: Not Found"
+
+
+  /suppliers/public/custom_tables:
+    get:
+      summary: "Get a list of all the custom tables defined for this account."
+      description: "Get a list of all the custom tables defined for this account."
+      operationId: "GetCustomTablesList"
+      tags:
+        - Custom Tables
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomTableListResults'
+        404:
+          description: Not found response
+          content:
+            text/plain:
+              schema:
+                title: Quote not found
+                type: string
+                example: "Error: Not Found"
+    post:
+      summary: "Create a new custom table."
+      description: "Create a new custom table by supplying a name."
+      operationId: 'CreateNewCustomTable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomTableName'
+      tags:
+        - Custom Tables
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomTableName'
+        404:
+          description: Not found response
+          content:
+            text/plain:
+              schema:
+                title: Quote not found
+                type: string
+                example: "Error: Not Found"
+
+  /suppliers/public/custom_tables/{tableName}:
+    get:
+      summary: "Get the details for a single table."
+      description: "Get the details for a single table."
+      operationId: 'GetCustomTableDetails'
+      parameters:
+        - $ref: '#/components/parameters/tableName'
+      tags:
+        - Custom Tables
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomTableDetails'
+        404:
+          description: Not found response
+          content:
+            text/plain:
+              schema:
+                title: Quote not found
+                type: string
+                example: "Error: Not Found"
+    patch:
+      summary: "Update a table's definition."
+      description: "Update a table's definition. You may rename the table, supply a new configuration, or supply new row data. Supplying new data without a new configuration will drop the existing data and populate the table with the new data (assuming the table has previously been configured) - this is not an append operation. Supplying a new configuration without new table data will apply the configuration and clear the table data. Supplying both a new configuration and new data will apply the configuration, drop the existing data, and populate the table with the new data."
+      operationId: 'UpdateCustomTableDetails'
+      parameters:
+        - $ref: '#/components/parameters/tableName'
+      tags:
+        - Custom Tables
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomTableBody'
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomTableDetails'
+        404:
+          description: Not found response
+          content:
+            text/plain:
+              schema:
+                title: Quote not found
+                type: string
+                example: "Error: Not Found"
+
+  /suppliers/public/purchased_components:
+    get:
+      summary: List purchased components
+      description: List all purchased components
+      operationId: ListPurchasedComponents
+      tags:
+        - Purchased Components
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+          required: False
+          description: "Value used to search against oem_part_number and internal_part_number. Comparisons are not case sensitive and will match when the field value includes the search value as a substring."
+        - in: query
+          name: page
+          schema:
+            type: string
+            default: 1
+          required: False
+          description: "The page of results to return."
+        - in: query
+          name: page_size
+          schema:
+            type: string
+            default: 500
+          required: False
+          description: "The page size of results to return. Default subject to change."
+
+      responses:
+        200:
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PurchasedComponent'
+
+    post:
+      summary: Create purchased component
+      description: Create a purchased component
+      operationId: CreatePurchasedComponent
+      tags:
+        - Purchased Components
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostPurchasedComponent'
+      responses:
+        200:
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PurchasedComponent'
+  /suppliers/public/purchased_components/{purchasedComponentId}:
+    patch:
+      summary: Update purchased component
+      description: Update a purchased component
+      operationId: UpdatePurchasedComponent
+      parameters:
+        - $ref: '#/components/parameters/purchasedComponentId'
+      tags:
+        - Purchased Components
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchPurchasedComponent'
+      responses:
+        200:
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PurchasedComponent'
+        404:
+          description: Not found response
+          content:
+            text/plain:
+              schema:
+                title: PurchasedComponent not found
+                type: string
+                example: "Error: Not Found"
+    delete:
+      summary: Delete purchased component
+      description: Delete a purchased component
+      operationId: DeletePurchasedComponent
+      parameters:
+        - $ref: '#/components/parameters/purchasedComponentId'
+      tags:
+        - Purchased Components
+      responses:
+        204:
+          description: Successful Response
+        404:
+          description: Not found response
+          content:
+            text/plain:
+              schema:
+                title: PurchasedComponent not found
+                type: string
+                example: "Error: Not Found"
+  /suppliers/public/purchased_component_columns:
+    get:
+      summary: List purchased components columns
+      description: List all custom purchased components columns
+      operationId: ListPurchasedComponentsColumns
+      tags:
+        - Purchased Components
+      responses:
+        200:
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PurchasedComponentsColumn'
+    post:
+      summary: Create purchased components columns
+      description: Creates a new custom purchased components columns
+      operationId: CreatePurchasedComponentsColumn
+      tags:
+        - Purchased Components
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostPurchasedComponentsColumn'
+      responses:
+        200:
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PurchasedComponentsColumn'
+  /suppliers/public/purchased_component_columns/{purchasedComponentsColumnId}:
+    patch:
+      summary: Update purchased components columns
+      description: Updates an existing custom purchased components columns
+      operationId: UpdatePurchasedComponentsColumn
+      parameters:
+        - $ref: '#/components/parameters/purchasedComponentsColumnId'
+      tags:
+        - Purchased Components
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchPurchasedComponentsColumn'
+      responses:
+        200:
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PurchasedComponentsColumn'
+        404:
+          description: Not found response
+          content:
+            text/plain:
+              schema:
+                title: PurchasedComponentsColumn not found
+                type: string
+                example: "Error: Not Found"
+    delete:
+      summary: Delete purchased components columns
+      description: Deletes an existing custom purchased components columns
+      operationId: DeletePurchasedComponentsColumn
+      parameters:
+        - $ref: '#/components/parameters/purchasedComponentsColumnId'
+      tags:
+        - Purchased Components
+      responses:
+        204:
+          description: Successful Response
+        404:
+          description: Not found response
+          content:
+            text/plain:
+              schema:
+                title: PurchasedComponentsColumn not found
+                type: string
+                example: "Error: Not Found"
+  /suppliers/public/purchased_components_csv:
+    get:
+      summary: Retrieve purchased components csv
+      description: Retrieve all purchased components for account in csv format
+      operationId: GetPurchasedComponentCSV
+      tags:
+        - Purchased Components
+
+      responses:
+        200:
+          description: Successful Response
+          content:
+            text/csv:
+              schema:
+                type: string
+
+    post:
+      summary: Upload purchased components csv
+      description: Replace all purchased components for account based on uploaded csv
+      operationId: PostPurchasedComponentCSV
+      tags:
+        - Purchased Components
+
+      responses:
+        204:
+          description: Successful Response
+
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                csv_file:
+                  type: string
+                  format: binary
+
+  
+  /managed_integrations/public:
+    get:
+      summary: Returns a list of managed integrations
+      description: Returns a list of managed integrations. Use the ID provided from the managed integration to create integration actions
+      operationId: ListManagedIntegrations
+      tags:
+        - Integration Actions
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ManagedIntegrationDetails'
+        404:
+          description: Not found response
+          content:
+            text/plain:
+              schema:
+                title: Managed integrations not found
+                type: string
+                example: "Error: Not Found"
+    post:
+      summary: Create managed integration
+      description: Creates a new managed integration. This is required to later create integration actions
+      operationId: CreateManagedIntegration
+      tags:
+        - Integration Actions
+      responses:
+        201:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagedIntegrationDetails'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManagedIntegration'
+
+  /managed_integrations/public/{managedIntegrationId}:
+    get:
+        summary: "Get managed integration details"
+        description: "Get the details for a managed integration"
+        operationId: GetManagedIntegration
+        parameters:
+          - in: path
+            name: managedIntegrationId
+            schema:
+              type: string
+            required: True
+            description: "The unique identifier for the managed integration to be returned"
+        tags:
+          - Integration Actions
+        responses:
+          200:
+            description: Successful response
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/ManagedIntegrationDetails'
+          404:
+            description: Not found response
+            content:
+              text/plain:
+                schema:
+                  title: Integration action with that action uuid not found
+                  type: string
+                  example: "Error: Not Found"
+    patch:
+      summary: "Update fields on a managed integration"
+      description: "Update fields on a managed integration. Cannot update ID or erp_name"
+      operationId: 'UpdateManagedIntegration'
+      parameters:
+        - in: path
+          name: managedIntegrationId
+          schema:
+            type: string
+          required: True
+          description: "The unique identifier for the managed integration to be returned"
+      tags:
+        - Integration Actions
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagedIntegrationDetails'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                is_active:
+                  type: boolean
+                  example: True
+                  description: whether the integration is active
+                erp_version:
+                  type: string
+                  example: "1.0"
+                  description: The version of the ERP system being integrated with
+                integration_version:
+                  type: string
+                  example: "1.0"
+                  description: The version of the codebase processing the integration
+                create_integration_action_after_creating_new_order:
+                  type: boolean
+                  example: True
+                  description: Whether a new integration action should be created after a new order is faciliated in Paperless
+                create_integration_action_after_quote_sent:
+                  type: boolean
+                  example: True
+                  description: Whether a new integration action should be created after a new quote is sent in Paperless
+
+
+
+  /managed_integrations/public/{managedIntegrationId}/integration_actions:
+    get:
+      summary: Returns a list of integration actions
+      description: "Returns a list of integration actions available to be used for ERP integrations."
+      operationId: ListIntegrationActions
+      parameters:
+        - in: path
+          name: managedIntegrationId
+          schema:
+            type: string
+          required: True
+          description: "The unique identifier for the managed integration whose integration actions you would like"
+        - in: query
+          name: status
+          schema:
+            type: string
+          required: False
+          description: "Value used to search for only integrations that current have a certain status. Valid options are queued, in_progress, completed, canceled, failed, or timed_out"
+        - in: query
+          name: action_type
+          schema:
+            type: string
+          required: False
+          description: "Value used to search for only integrations that current have a certain action_type. Valid options are export_order, export_quote, import_purchased_component, import_work_center, import_vendor, import_material, or import_account"
+        - in: query
+          name: page
+          schema:
+            type: string
+          required: False
+          description: "The page of results to return."
+      tags:
+        - Integration Actions
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/IntegrationAction'
+        404:
+          description: Not found response
+          content:
+            text/plain:
+              schema:
+                title: Integration actions not found
+                type: string
+                example: "Error: Not Found"
+    post:
+      summary: Create new integration action
+      parameters:
+          - in: path
+            name: managedIntegrationId
+            schema:
+              type: string
+            required: True
+            description: "The unique identifier for the managed integration whose integration action you would like"
+      description: Creates a new integration action
+      operationId: CreateIntegrationAction
+      tags:
+        - Integration Actions
+      responses:
+        201:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrationAction'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action_type:
+                      type: string
+                      example: "export_order"
+                      description: the type of action being requested
+                entity_id:
+                  type: string
+                  example: "8"
+                  description: The identifier for the entity that should be processed as part of the action. For example, process order 8
+
+  /managed_integrations/public/{managedIntegrationId}/integration_actions/{action_uuid}:
+    get:
+        summary: "Get integration action details"
+        description: "Get the details for a specific integration action."
+        operationId: 'Get integration action details'
+        parameters:
+          - in: path
+            name: managedIntegrationId
+            schema:
+              type: string
+            required: True
+            description: "The unique identifier for the managed integration whose integration action you would like"
+          - in: path
+            name: action_uuid
+            schema:
+              type: string
+            required: True
+            description: "The unique identifier for the integration action to be returned"
+        tags:
+          - Integration Actions
+        responses:
+          200:
+            description: Successful response
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/IntegrationAction'
+          404:
+            description: Not found response
+            content:
+              text/plain:
+                schema:
+                  title: Integration action with that action uuid not found
+                  type: string
+                  example: "Error: Not Found"
+        
+    patch:
+      summary: "Update fields on an integration action"
+      description: "Update fields on an integration action."
+      operationId: 'UpdateOrder'
+      parameters:
+        - in: path
+          name: managedIntegrationId
+          schema:
+            type: string
+          required: True
+          description: "The unique identifier for the managed integration whose integration action you would like"
+        - in: path
+          name: action_uuid
+          schema:
+            type: string
+          required: True
+          description: "The unique identifier for the integration action to be returned"
+      tags:
+        - Integration Actions
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrationAction'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  example: "in_progress"
+                  description: the new status of the integration action
+                status_message:
+                  type: string
+                  example: "The order 8 is now processing"
+                  description: The new status message for the integration
+              
+
+components:
+  securitySchemes:
+    app_id:
+      type: apiKey
+      description: "API key to authorize requests."
+      name: Authorization
+      in: header
+
+  parameters:
+    last_quote:
+      name: last_quote
+      in: query
+      description: "**Last known sent quote number**. You may supply the number of the last known quote."
+      schema:
+        $ref: '#/components/schemas/QuoteNumber'
+    revision:
+      name: revision
+      in: query
+      description: "**Last known sent quote revision number**. You may supply the revision number of the last known quote."
+      schema:
+        $ref: '#/components/schemas/RevisionNumber'
+    quoteNumber:
+      name: quoteNumber
+      in: path
+      description: "The quote number"
+      required: true
+      schema:
+        $ref: '#/components/schemas/QuoteNumber'
+    revisionNumber:
+      name: revision
+      in: query
+      description: "The (optional) quote revision number"
+      required: false
+      schema:
+        $ref: '#/components/schemas/RevisionNumber'
+    last_order:
+      name: last_order
+      in: query
+      description: "**Last known order number**. You may supply the number of the last known order."
+      schema:
+        $ref: '#/components/schemas/OrderNumber'
+    orderNumber:
+      name: orderNumber
+      in: path
+      description: "The order number"
+      required: true
+      schema:
+        $ref: '#/components/schemas/OrderNumber'
+    accountLocator:
+      name: accountLocator
+      in: path
+      description: "The text identifier (slug) for the account"
+      required: true
+      schema:
+        $ref: '#/components/schemas/AccountLocator'
+    tableName:
+      name: tableName
+      in: path
+      description: "The name of the table"
+      required: true
+      schema:
+        $ref: '#/components/schemas/TableName'
+    contactId:
+      name: contactId
+      in: path
+      description: The integer idenfier of a Contact, assigned automatically by Paperless Parts
+      required: true
+      schema:
+        $ref: '#/components/schemas/CustomerId'
+    erp_code:
+      name: erp_code
+      in: query
+      description: The erp code of the company to retrieve
+      example: "PPI"
+      schema:
+        $ref: '#/components/schemas/ErpCode'
+    accountId:
+      name: accountId
+      in: path
+      required: true
+      example: 17
+      schema:
+        $ref: '#/components/schemas/AccountId'
+    billingAddressId:
+      name: billingAddressId
+      in: path
+      required: true
+      example: 27
+      schema:
+        $ref: '#/components/schemas/BillingAddressId'
+    facilityId:
+      name: facilityId
+      in: path
+      required: true
+      example: 30
+      schema:
+        $ref: '#/components/schemas/FacilityId'
+    purchasedComponentsColumnId:
+      name: purchasedComponentsColumnId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/PurchasedComponentsColumnId'
+    purchasedComponentId:
+      name: purchasedComponentId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/PurchasedComponentId'
+
+
+  schemas:
+    AccountLocator:
+      type: string
+      description: "The text identifier (slug) for the account"
+      example: acme-machining
+    TableName:
+      type: string
+      description: "The name of the table"
+      example: sample_table
+    AccountId:
+      type: integer
+      description: "The account id"
+      example: '13'
+    BillingAddressId:
+      type: integer
+      description: "The billing address id"
+      example: '27'
+    CustomerId:
+      type: integer
+      description: "The customer id"
+      example: '32'
+    ErpCode:
+      type: string
+      description: "The erp code for a comapny"
+      example: 'PPI'
+    FacilityId:
+      type: integer
+      description: "The facility id"
+      example: '30'
+    QuoteNumber:
+      type: integer
+      description: "A unique identifier for a Quote"
+      example: 37
+    RevisionNumber:
+      type: integer
+      description: "A unique revision number for a Quote. May be null."
+      example: 1
+    QuoteRevisionPair:
+      type: object
+      properties:
+        quote:
+          $ref: '#/components/schemas/QuoteNumber'
+        revision_number:
+          $ref: '#/components/schemas/RevisionNumber'
+    QuoteNumberArray:
+      type: array
+      items:
+        $ref: '#/components/schemas/QuoteRevisionPair'
+    ManagedIntegration:
+      type: object
+      properties:
+        erp_name:
+          type: string
+          example: "JobBOSS"
+          description: The name of the ERP being integrated with
+        is_active:
+          type: boolean
+          example: True
+          description: whether the integration is active
+        erp_version:
+          type: string
+          example: "1.0"
+          description: The version of the ERP system being integrated with
+        integration_version:
+          type: string
+          example: "1.0"
+          description: The version of the codebase processing the integration
+        create_integration_action_after_creating_new_order:
+          type: boolean
+          example: True
+          description: Whether a new integration action should be created after a new order is faciliated in Paperless
+        create_integration_action_after_quote_sent:
+          type: boolean
+          example: True
+          description: Whether a new integration action should be created after a new quote is sent in Paperless
+    ManagedIntegrationDetails:
+      allOf:
+        - $ref: '#/components/schemas/ManagedIntegration'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 42124
+    IntegrationAction:
+      type: object
+      properties:
+        action_type:
+            type: string
+            example: "export_order"
+            description: the type of action being requested
+        action_uuid:
+          type: string
+          example: "ff27bec2-ff2a-49b8-93fe-1a6c1b8f9f39"
+          description: the id for action
+        status:
+          type: string
+          example: "in_progress"
+          description: The current status of the action
+        status_message:
+          type: string
+          example: "Order 8 is currently being processed"
+        entity_id:
+          type: string
+          example: "8"
+          description: The identifier for the entity that should be processed as part of the action. For example, process order 8   
+    PurchasedComponentProperty:
+      type: object
+      properties:
+        name:
+          type: string
+          description: "Name of corresponding purchased component column in table display"
+        code_name:
+          type: string
+          description: "Name used to access property within pricing formulas via 'dot' operator"
+        value_type:
+          type: string
+          enum: ['string', 'boolean', 'numeric']
+        value:
+          anyOf:
+            - type: string
+            - type: number
+            - type: boolean
+          nullable: true
+          description: "Value of property, None or of type corresponding to value_type"
+    PurchasedComponentCustomProperty:
+      type: object
+      properties:
+        key:
+          type: string
+          description: "Name of corresponding purchased component column in table display"
+          example: property name
+        value:
+          anyOf:
+            - type: string
+            - type: number
+            - type: boolean
+          nullable: true
+          description: "Value of property, None or of type corresponding to value_type"
+          example: really cool value
+    AbstractPurchasedComponent:
+      type: object
+      properties:
+        oem_part_number:
+          type: string
+          description: "Unique identifier for purchased component within a supplier account"
+          example: "064-1235"
+        internal_part_number:
+          type: string
+          nullable: true
+          example: a
+        description:
+          type: string
+          nullable: true
+          example: any text you want
+        piece_price:
+          type: number
+          format: decimal
+          nullable: false
+          description: "Cost per piece to 4 decimal places"
+          example: 2.0000
+    PostPurchasedComponent:
+      allOf:
+        - $ref: '#/components/schemas/AbstractPurchasedComponent'
+        - type: object
+          properties:
+            properties:
+              type: array
+              items:
+                $ref: '#/components/schemas/PurchasedComponentCustomProperty'
+          required:
+            - oem_part_number
+            - piece_price
+            - properties
+    PatchPurchasedComponent:
+      allOf:
+        - $ref: '#/components/schemas/AbstractPurchasedComponent'
+        - type: object
+          properties:
+            properties:
+              type: array
+              items:
+                $ref: '#/components/schemas/PurchasedComponentCustomProperty'
+    PurchasedComponent:
+      allOf:
+        - $ref: '#/components/schemas/AbstractPurchasedComponent'
+        - type: object
+          properties:
+            id:
+              type: integer
+            properties:
+              type: array
+              items:
+                $ref: '#/components/schemas/PurchasedComponentCustomProperty'
+    QuotePurchasedComponent:
+      allOf:
+        - $ref: '#/components/schemas/AbstractPurchasedComponent'
+        - type: object
+          properties:
+            id:
+              type: string
+            properties:
+              type: array
+              items:
+                $ref: '#/components/schemas/PurchasedComponentProperty'
+    QuoteExpedite:
+      type: object
+      description: "Expedites represent an additional option for pricing where quote recipients can request a shorter lead time, with an additional markup applied to the unit price."
+      properties:
+        id:
+          type: integer
+        lead_time:
+          type: integer
+          description: "Days"
+        markup:
+          type: number
+          format: float
+          description: "Percent"
+        unit_price:
+          type: number
+          format: float
+        total_price:
+          type: number
+          format: float
+    QuoteQuantity:
+      type: object
+      description: "A quantity object represents a unit price and a numerical quantity associated with a component. A component can have many quantities, and the set of quantities represents the pricing options available to the recipient of a quote."
+      properties:
+        id:
+          type: integer
+        quantity:
+          type: integer
+        markup_1_price:
+          type: number
+          format: float
+          description: "Users of Paperless Parts can specify up to two distinct markup values on a component."
+          nullable: true
+        markup_1_name:
+          type: string
+          nullable: true
+        markup_2_price:
+          type: number
+          format: float
+          description: "Users of Paperless Parts can specify up to two distinct markup values on a component."
+          nullable: true
+        markup_2_name:
+          type: string
+          nullable: true
+        unit_price:
+          type: number
+          format: float
+        total_price:
+          type: number
+          format: float
+        total_price_with_required_add_ons:
+          type: number
+          format: float
+        lead_time:
+          type: integer
+          description: "Days"
+        expedites:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuoteExpedite'
+        is_most_likely_won_quantity:
+          type: boolean
+          description: "Whether or not this quantity is the most likely quantity to be won."
+        most_likely_won_quantity_percent:
+          type: integer
+    QuoteProcess:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        external_name:
+          type: string
+          nullable: true
+    QuoteMaterial:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        display_name:
+          type: string
+    QuoteAddOnQuantity:
+      type: object
+      properties:
+        price:
+          type: number
+          format: float
+        manual_price:
+          type: number
+          format: float
+        quantity:
+          type: integer
+    QuoteAddOn:
+      type: object
+      properties:
+        is_required:
+          type: boolean
+        name:
+          type: string
+        notes:
+          type: string
+        quantities:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuoteAddOnQuantity'
+        costing_variables:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuoteCostingVariable'
+    QuoteComponent:
+      type: object
+      description: "Represents a component in the quote item. In the simplest case, there is a single root component. If the quote item is an assembly, the array will contain each component in the assembly. Components can be manufactured (i.e., parts), assemblies (i.e., top-level or sub-assembly), or purchased (e.g., hardware). Exactly one component in the array will be the root component, but it might not be the first element in the array."
+      properties:
+        id:
+          type: string
+        add-ons:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuoteAddOn"
+        quantities:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuoteQuantity"
+        child_ids:
+          type: array
+          items:
+            type: integer
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComponentChild'
+        description:
+          type: string
+          nullable: true
+        export_controlled:
+          type: boolean
+          description: "Whether or not this component contains data that is export controlled (ITAR) by the US Government."
+        finishes:
+          type: array
+          items:
+            type: string
+          description: "Note: this field is deprecated. Finishes now show up as Operations."
+        innate_quantity:
+          type: integer
+          description: "The quantity of this subcomponent that must be produced to make one top-level component."
+        is_root_component:
+          type: boolean
+        material:
+          $ref: '#/components/schemas/OrderMaterial'
+        material_operations:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuoteOperation'
+        parent_ids:
+          type: array
+          items:
+            type: integer
+        part_name:
+          type: string
+        part_number:
+          type: string
+          nullable: true
+        part_url:
+          type: string
+          format: url
+        part_uuid:
+          type: string
+        process:
+          $ref: '#/components/schemas/OrderProcess'
+        purchased_component:
+          nullable: true
+          description: "Reference to a purchased component object within the supplier account. Will be not null when type == 'purchased'"
+          $ref: '#/components/schemas/QuotePurchasedComponent'
+        revision:
+          type: string
+          nullable: true
+        shop_operations:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuoteOperation'
+        supporting_files:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderSupportingFile'
+        thumbnail_url:
+          type: string
+          nullable: true
+        type:
+          type: string
+          enum: ['assembled', 'manufactured', 'purchased']
+    QuoteItem:
+      type: object
+      description: "A quote item represents a line item in a quote. Quote items can either be manual or automatic, as indicated by the 'type' property. Automatic quote items are those generated by adding a part to a quote. Pricing data for automatic quote items is automatically populated using the process, material, and operations, if they exist. Manual quote items do not have an associated part, so the pricing information must be inputted manually."
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: ['automatic', 'manual']
+          description: "Indicates whether the quote item is associated with a part (automatic pricing), or not (manual pricing)."
+        root_component_id:
+          type: integer
+          description: "ID of the root component. A root component houses the pricing information for a quote item. Every quote item has a root component. In the case of an automatic quote item, the root component corresponds to a part; in the case of a manual quote item, which does not have an associated part, the root component stores the manual pricing data. As the name 'root component' implies, it is possible for a quote item to have many components, as in the case of an assembly of nested parts."
+        components:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuoteComponent'
+        position:
+          type: integer
+          description: "The position of the quote item in the quote display, indexed from 1."
+        export_controlled:
+          type: boolean
+          description: "Whether or not this quote item contains data that is export controlled (ITAR) by the US Government."
+        component_ids:
+          type: array
+          items:
+            type: integer
+        private_notes:
+          type: string
+          nullable: true
+        public_notes:
+          type: string
+          nullable: true
+    QuoteContact:
+      type: object
+      properties:
+        account:
+          type: object
+          properties:
+            erp_code:
+              type: string
+              nullable: true
+            id:
+              type: number
+              format: int
+            notes:
+              type: string
+              nullable: true
+            name:
+              type: string
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        id:
+          type: number
+          format: int
+        last_name:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        phone_ext:
+          type: string
+          nullable: true
+    QuoteCustomer:
+      type: object
+      description: "Deprecated! Will be removed soon"
+      properties:
+        first_name:
+          type: string
+        last_name:
+          type: string
+        email:
+          type: string
+          format: email
+        notes:
+          type: string
+          nullable: true
+        company:
+          type: object
+          properties:
+            notes:
+              type: string
+              nullable: true
+            metrics:
+              type: object
+              properties:
+                order_revenue_all_time:
+                  type: number
+                  format: float
+                order_revenue_last_thirty_days:
+                  type: number
+                  format: float
+                quotes_sent_all_time:
+                  type: integer
+                quotes_sent_last_thirty_days:
+                  type: integer
+            business_name:
+              type: string
+            erp_code:
+              type: string
+    SalesPerson:
+      type: object
+      properties:
+        first_name:
+          type: string
+        last_name:
+          type: string
+        email:
+          type: string
+          format: email
+        erp_code:
+          type: string
+    ParentQuote:
+      type: object
+      description: "Basic information about the quote this was copied from, if any. This field may be NULL."
+      properties:
+        id:
+          type: integer
+        number:
+          type: integer
+        status:
+          type: string
+    ParentSupplierOrder:
+      type: object
+      description: "Basic information about the order this was copied from, if any. This field may be NULL."
+      properties:
+        id:
+          type: integer
+        number:
+          type: integer
+        status:
+          type: string
+    Quote:
+      type: object
+      description: "Data representing a Quote"
+      properties:
+        authenticated_pdf_quote_url:
+          type: string
+          format: url
+          nullable: true
+        contact:
+          $ref: '#/components/schemas/QuoteContact'
+        created:
+          type: string
+          format: date-time
+        customer:
+          $ref: '#/components/schemas/QuoteCustomer'
+        digital_last_viewed_on:
+          type: string
+          format: date-time
+          nullable: true
+          description: "The last time the quote recipient viewed the quote"
+        erp_code:
+          type: string
+          nullable: true
+        estimator:
+          $ref: '#/components/schemas/SalesPerson'
+        expired:
+          type: boolean
+        expired_date:
+          type: string
+          format: date-time
+        export_controlled:
+          type: boolean
+          description: "Whether or not this quote contains data that is export controlled (ITAR) by the US Government."
+        id:
+          type: integer
+        is_unviewed_drafted_rfq:
+          type: boolean
+          description: "Quotes can be automatically generated by a supplier's RFQ form. If this quote was drafted via an RFQ and has not been viewed, this will be true."
+        number:
+          $ref: '#/components/schemas/QuoteNumber'
+        order_numbers:
+          $ref: '#/components/schemas/OrderNumberArray'
+        parent_quote:
+          $ref: '#/components/schemas/ParentQuote'
+        parent_supplier_order:
+          $ref: '#/components/schemas/ParentSupplierOrder'
+        private_notes:
+          type: string
+          nullable: true
+        quote_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuoteItem'
+        quote_notes:
+          type: string
+          nullable: true
+        request_for_quote:
+          type: boolean
+          nullable: true
+        revision_number:
+          $ref: '#/components/schemas/RevisionNumber'
+        salesperson:
+          $ref: '#/components/schemas/SalesPerson'
+        sent_date:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+          enum: ['draft', 'outstanding', 'expired', 'cancelled', 'partially_accepted', 'accepted', 'trash', 'lost']
+        tax_cost:
+          type: number
+          format: float
+        tax_rate:
+          type: number
+          format: float  
+
+    OrderNumber:
+      type: integer
+      description: "A unique identifier for an Order"
+      example: 47
+    OrderNumberArray:
+      type: array
+      items:
+        $ref: '#/components/schemas/OrderNumber'
+      description: "An array of Order numbers"
+      example: [38, 39, 40]
+    AddressInfo:
+      type: object
+      nullable: true
+      properties:
+        id:
+          type: integer
+          example: 55123
+        address1:
+          type: string
+          example: 1 City Hall Sq.
+        address2:
+          type: string
+          nullable: true
+          example: null
+        attention:
+          type: string
+          example: Gordon Moore
+        business_name:
+          type: string
+          example: Paperless Parts, Inc.
+        city:
+          type: string
+          example: Boston
+        country:
+          type: string
+          example: USA
+        facility_name:
+          type: string
+          nullable: true
+          example: "Boston Office"
+        phone:
+          type: string
+          example: "6176354500"
+        phone_ext:
+          type: string
+          example: null
+          nullable: true
+        postal_code:
+          type: string
+          example: 02201
+        state:
+          type: string
+          example: MA
+    Facility:
+      type: object
+      nullable: true
+      properties:
+        account_id:
+          type: integer
+          example: 55123
+        address:
+          $ref: '#/components/schemas/Address'
+        attention:
+          type: string
+          example: Gordon Moore
+        id:
+          type: integer
+          example: 12
+        name:
+          type: string
+          example: Boston Office
+        salesperson:
+          $ref: '#/components/schemas/SalesPerson'
+    OrderCompany:
+      type: object
+      properties:
+        business_name:
+          type: string
+        erp_code:
+          type: string
+    OrderContact:
+      type: object
+      properties:
+        account:
+          type: object
+          properties:
+            erp_code:
+              type: string
+              nullable: true
+            id:
+              type: number
+              format: int
+            notes:
+              type: string
+              nullable: true
+            name:
+              type: string
+            payment_terms:
+              type: string
+              nullable: true
+            payment_terms_period:
+              type: string
+              nullable: true
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        phone_ext:
+          type: string
+          nullable: true
+    OrderCustomer:
+      type: object
+      description: Deprecated! Will be removed soon.
+      properties:
+        company:
+          $ref: '#/components/schemas/OrderCompany'
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+        phone:
+          type: string
+        phone_ext:
+          type: string
+    OrderMaterial:
+      type: object
+      description: "This can also be null"
+      properties:
+        id:
+          type: integer
+        display_name:
+          type: string
+        family:
+          type: string
+        material_class:
+          type: string
+        name:
+          type: string
+    QuoteCostingVariable:
+      type: object
+      description: "A CostingVariable is a piece of a Paperless Parts Programming Language (P3L) formula that determines the price and timing for an operation. CostingVariables are essentially Python variables and can represent several data types."
+      properties:
+        label:
+          type: string
+        variable_class:
+          type: string
+          enum: ['basic', 'drop_down', 'table']
+        value_type:
+          type: string
+          enum: ['string', 'number', 'currency', 'boolean']
+          description: "Describes the type of the 'value' key in quantities property"
+        quantity_specific:
+          type: boolean
+          description: "Flag as to whether or not this costing variable can be manipulated for each quantity break"
+        quantities:
+          type: array
+          items:
+            type: object
+            properties:
+              stringQuotedQuantity1:
+                type: object
+                properties:
+                  value:
+                    anyOf:
+                      - type: number
+                      - type: string
+                      - type: boolean
+                    nullable: true
+                  row:
+                    type: object
+                    nullable: true
+                  options:
+                    type: array
+                    items:
+                      anyOf:
+                        - type: number
+                        - type: string
+                    nullable: true
+              stringQuotedQuantity2:
+                type: object
+                properties:
+                  value:
+                    anyOf:
+                      - type: number
+                      - type: string
+                      - type: boolean
+                    nullable: true
+                  row:
+                    type: object
+                    nullable: true
+                  options:
+                    type: array
+                    items:
+                      anyOf:
+                        - type: number
+                        - type: string
+                    nullable: true
+          description: "The value of the costing variable for each quoted quantity. This is an object with keys corresponding to the top level quote quantities in string form e.g. '1', '5', '10'. The values for each of these keys take different shape depending on the variable_class. If variable_class=='basic', the dictionary values will take the shape {'value': 1.0}. If variable_class=='drop_down', the dictionary values will take the shape {'value': 'a', 'options': ['a', 'b']}. If variable_class=='table', the dictionary values will take the shape {'value': 'a', 'row': {'column1': 'a', 'column2': 'b'}}. So for quoted quantities 1, 5, 10 for a basic variable_class, the object will look like: {'1': {'value': 1.0}, '5': {'value': 2.0}, '10': {'value': 3.0}}"
+        type:
+          type: string
+          description: "To Be Deprecated"
+          deprecated: false
+        value:
+          anyOf:
+            - type: string
+            - type: number
+            - type: integer
+            - type: boolean
+          nullable: true
+          description: "This will be indicated by the value_type field. To Be Deprecated"
+          deprecated: false
+        row:
+          type: object
+          nullable: true
+          description: "The row field will only be non-null when the type field is 'table'. Row represents a row in a lookup table and is an object with arbitrary keys. To Be Deprecated"
+          deprecated: false
+    OrderCostingVariable:
+      type: object
+      description: "A CostingVariable is a piece of a Paperless Parts Programming Language (P3L) formula that determines the price and timing for an operation. CostingVariables are essentially Python variables and can represent several data types. An OrderCostingVariable represents the value a variable holds for the ordered quantity."
+      properties:
+        label:
+          type: string
+        variable_class:
+          type: string
+          enum: ['basic', 'drop_down', 'table']
+        value_type:
+          type: string
+          enum: ['string', 'number', 'currency', 'boolean']
+        value:
+          anyOf:
+            - type: string
+            - type: number
+            - type: integer
+            - type: boolean
+          nullable: true
+          description: "This will be indicated by the value_type field."
+        row:
+          type: object
+          nullable: true
+          description: "An object representing a row from a custom table. This object will have arbitrary key-value pairs based on custom table schema it was pulled from. The row field will only be non-null when the variable_class field is 'table'."
+        options:
+          type: array
+          items:
+            anyOf:
+              - type: number
+              - type: string
+          nullable: true
+          description: "A list of the options for a drop down variable. Can be strings, floats, or integers indicated by value_type. The options field will only be non-null when the variable_class field is 'drop_down'."
+        type:
+          type: string
+          description: "To Be Deprecated"
+          deprecated: false
+    OperationQuantity:
+      type: object
+      properties:
+        price:
+          type: number
+          format: float
+        manual_price:
+          type: number
+          format: float
+          nullable: true
+        lead_time:
+          type: integer
+          nullable: true
+        manual_lead_time:
+          type: integer
+          nullable: true
+        quantity:
+          type: integer
+    QuoteOperation:
+      type: object
+      properties:
+        id:
+          type: integer
+        category:
+          type: string
+          enum: ['material', 'operation']
+        cost:
+          type: number
+          format: float
+        costing_variables:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuoteCostingVariable'
+        quantities:
+          type: array
+          items:
+            $ref: '#/components/schemas/OperationQuantity'
+        is_finish:
+          type: boolean
+        is_outside_service:
+          type: boolean
+        name:
+          type: string
+        operation_definition_name:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        position:
+          type: integer
+          description: "The position of the order operation in the order display, indexed from 1. Note that the position applies across both material operations and order operations. TODO - this shows up as 0 if there is only one operation on the order?"
+        runtime:
+          type: number
+          format: float
+          nullable: true
+        setup_time:
+          type: number
+          format: float
+          nullable: true
+    OrderOperation:
+      type: object
+      properties:
+        id:
+          type: integer
+        category:
+          type: string
+          enum: ['material', 'operation']
+        cost:
+          type: number
+          format: float
+        costing_variables:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderCostingVariable'
+        quantities:
+          type: array
+          items:
+            $ref: '#/components/schemas/OperationQuantity'
+        is_finish:
+          type: boolean
+        is_outside_service:
+          type: boolean
+        name:
+          type: string
+        operation_definition_name:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        position:
+          type: integer
+          description: "The position of the order operation in the order display, indexed from 1. Note that the position applies across both material operations and order operations. TODO - this shows up as 0 if there is only one operation on the order?"
+        runtime:
+          type: number
+          format: float
+          nullable: true
+        setup_time:
+          type: number
+          format: float
+          nullable: true
+    ComponentChild:
+      type: object
+      properties:
+        child_id:
+          type: integer
+          description: "ID of the child component"
+        quantity:
+          type: integer
+          description: "The number of child component instances belonging to this parent. Note, the total number of instances of this child component in this assembly tree may be larger if this child appears in multiple places in the tree."
+    OrderProcess:
+      type: object
+      properties:
+        id:
+          type: integer
+        external_name:
+          type: string
+        name:
+          type: string
+    OrderSupportingFile:
+      type: object
+      properties:
+        filename:
+          type: string
+        url:
+          type: string
+          format: url
+    OrderComponent:
+      type: object
+      properties:
+        id:
+          type: string
+        child_ids:
+          type: array
+          items:
+            type: integer
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComponentChild'
+        deliver_quantity:
+          type: integer
+          description: "The quantity of this component that must be delivered (innate quantity * root component quantity)."
+        description:
+          type: string
+          nullable: true
+        export_controlled:
+          type: boolean
+          description: "Whether or not this order component contains data that is export controlled (ITAR) by the US Government."
+        finishes:
+          type: array
+          items:
+            type: string
+          description: "Note: this field is deprecated. Finishes now show up as Operations."
+        innate_quantity:
+          type: integer
+          description: "The quantity of this subcomponent that must be produced to make one top-level component."
+        is_root_component:
+          type: boolean
+        make_quantity:
+          type: integer
+          description: "The quantity of this component that must be made to satisfy the quantity specified by the customer as well as the yield specified for this component (innate quantity * root component quantity / yield)."
+        material:
+          $ref: '#/components/schemas/OrderMaterial'
+        material_operations:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderOperation'
+        parent_ids:
+          type: array
+          items:
+            type: integer
+        part_name:
+          type: string
+        part_number:
+          type: string
+          nullable: true
+        part_url:
+          type: string
+          format: url
+        part_uuid:
+          type: string
+        process:
+          $ref: '#/components/schemas/OrderProcess'
+        purchased_component:
+          nullable: true
+          description: "Reference to a purchased component object within the supplier account. Will be not null when type == 'purchased'"
+          $ref: '#/components/schemas/QuotePurchasedComponent'
+        revision:
+          type: string
+          nullable: true
+        shop_operations:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderOperation'
+        supporting_files:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderSupportingFile'
+        thumbnail_url:
+          type: string
+          nullable: true
+        type:
+          type: string
+          enum: ['assembled', 'manufactured', 'purchased']
+    OrderAddOn:
+      type: object
+      properties:
+        is_required:
+          type: boolean
+        name:
+          type: string
+        notes:
+          type: string
+        price:
+          type: number
+          format: float
+        quantity:
+          type: integer
+        costing_variables:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderCostingVariable'
+    OrderItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        components:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderComponent'
+        description:
+          type: string
+          nullable: true
+        expedite_revenue:
+          type: number
+          format: float
+          nullable: true
+        export_controlled:
+          type: boolean
+          description: "Whether or not this order item contains data that is export controlled (ITAR) by the US Government."
+        filename:
+          type: string
+        lead_days:
+          type: integer
+        markup_1_price:
+          type: number
+          format: float
+        markup_1_name:
+          type: string
+        markup_2_price:
+          type: number
+          format: float
+        markup_2_name:
+          type: string
+        private_notes:
+          type: string
+          nullable: true
+        public_notes:
+          type: string
+          nullable: true
+        quantity:
+          type: integer
+        quantity_outstanding:
+          type: integer
+        quote_item_id:
+          type: integer
+        quote_item_type:
+          type: string
+          enum: ['automatic', 'manual']
+          description: "Indicates whether the quote item is associated with a part (automatic pricing), or not (manual pricing)."
+        root_component_id:
+          type: integer
+        ships_on:
+          type: string
+          format: date
+        total_price:
+          type: number
+          format: float
+        unit_price:
+          type: number
+          format: float
+        base_price:
+          type: number
+          format: float
+        add_on_fees:
+          type: number
+          format: float
+          nullable: true
+        ordered_add_ons:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderAddOn'
+    OrderPaymentDetails:
+      type: object
+      properties:
+        card_brand:
+          type: string
+          nullable: true
+        card_last4:
+          type: string
+          nullable: true
+        net_payout:
+          type: number
+          format: float
+          nullable: true
+        payment_type:
+          type: string
+          enum: ['credit_card', 'purchase_order']
+          nullable: true
+        purchase_order_number:
+          type: string
+        purchasing_dept_contact_email:
+          type: string
+          format: email
+          nullable: true
+        purchasing_dept_contact_name:
+          type: string
+          nullable: true
+        shipping_cost:
+          type: number
+          format: float
+        subtotal:
+          type: number
+          format: float
+        tax_cost:
+          type: number
+          format: float
+        tax_rate:
+          type: number
+          format: float
+        payment_terms:
+          type: string
+          nullable: true
+        total_price:
+          type: number
+          format: float
+    OrderShipmentItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        order_item_id:
+          type: integer
+        quantity:
+          type: integer
+    OrderShipment:
+      type: object
+      properties:
+        id:
+          type: integer
+        pickup_recipient:
+          type: string
+          nullable: true
+        shipment_date:
+          type: string
+          format: date-time
+        shipment_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderShipmentItem'
+        shipping_cost:
+          type: number
+          format: float
+        tracking_number:
+          type: string
+    OrderShippingOption:
+      type: object
+      properties:
+        customers_account_number:
+          type: string
+          nullable: true
+        customers_carrier:
+          type: string
+          enum: ['ups', 'fedex']
+          nullable: true
+        shipping_method:
+          type: string
+          enum: ['early_am_overnight', 'ground', 'next_day_air', 'second_day_air']
+          nullable: true
+        type:
+          type: string
+          enum: ['pickup', 'customers_shipping_account', 'suppliers_shipping_account']
+    Order:
+      type: object
+      properties:
+        billing_info:
+          $ref: '#/components/schemas/AddressInfo'
+        created:
+          type: string
+          format: date-time
+        contact:
+          $ref: '#/components/schemas/OrderContact'
+        customer:
+          $ref: '#/components/schemas/OrderCustomer'
+        deliver_by:
+          type: string
+          format: date-time
+          nullable: true
+        erp_code:
+          type: string
+          nullable: true
+        estimator:
+          $ref: '#/components/schemas/SalesPerson'
+        number:
+          $ref: '#/components/schemas/OrderNumber'
+        order_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        payment_details:
+          $ref: '#/components/schemas/OrderPaymentDetails'
+        private_notes:
+          type: string
+          nullable: true
+        quote_erp_code:
+          type: string
+          nullable: true
+        quote_number:
+          type: integer
+        quote_revision_number:
+          type: integer
+        salesperson:
+          $ref: '#/components/schemas/SalesPerson'
+        shipments:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderShipment'
+        shipping_info:
+          $ref: '#/components/schemas/AddressInfo'
+        shipping_option:
+          $ref: '#/components/schemas/OrderShippingOption'
+        ships_on:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: ['pending', 'confirmed', 'on_hold', 'in_process', 'completed', 'cancelled']
+    FacilitateOrderBody:
+      type: object
+      description: "Data representing a Quote that will be used to generate an Order. This endpoint provides an alternative to the checkout flow in the app. For each quote item you'd like to check out for, specify the quantity and unit price. Note that you may submit an arbitrary quantity and arbitrary unit price; you are not restricted to the options on the quote.
+        \n\n
+        NOTE: shipping_info, billing_info and shipping_option are optional.
+      "
+      properties:
+        number:
+          type: integer
+        quantity_data:
+          type: array
+          items:
+            type: object
+            properties:
+              quote_item_id:
+                type: integer
+              quantity:
+                type: integer
+              unit_price:
+                type: number
+                format: float
+              add_ons:
+                type: array
+                description: "If you'd like to apply add-ons, specify the ID of the AddOn you'd like to apply (not the ID of the AddOnQuantity). If you've selected an existing quantity and unit price for this quote item, the corresponding existing AddOnQuantity will be used. If you've specified a nonexistent quantity and/or unit price, a new AddOnQuantity will be created with the supplied manual_price."
+                items:
+                  type: object
+                  properties:
+                    add_on_id:
+                      type: integer
+                    manual_price:
+                      type: number
+                      format: float
+                      nullable: true
+                      description: "There is no need to supply this field if you have selected an existing quantity and unit_price for this quote item."
+              expedite_id:
+                type: integer
+                nullable: true
+                description: ""
+        shipping_info:
+          type: object
+          nullable: true
+          properties:
+            business_name:
+              type: string
+            first_name:
+              type: string
+            last_name:
+              type: string
+            phone:
+              type: string
+            phone_ext:
+              type: string
+            address:
+              type: object
+              properties:
+                address1:
+                  type: string
+                address2:
+                  type: string
+                postal_code:
+                  type: string
+                city:
+                  type: string
+                state:
+                  type: object
+                  properties:
+                    abbr:
+                      type: string
+                country:
+                  type: object
+                  properties:
+                    abbr:
+                      type: string
+        billing_info:
+          type: object
+          nullable: true
+          properties:
+            business_name:
+              type: string
+            first_name:
+              type: string
+            last_name:
+              type: string
+            phone:
+              type: string
+            phone_ext:
+              type: string
+            address:
+              type: object
+              properties:
+                address1:
+                  type: string
+                address2:
+                  type: string
+                postal_code:
+                  type: string
+                city:
+                  type: string
+                state:
+                  type: object
+                  properties:
+                    abbr:
+                      type: string
+                country:
+                  type: object
+                  properties:
+                    abbr:
+                      type: string
+        shipping_option:
+          nullable: true
+          type: object
+          properties:
+            type:
+              type: string
+              enum: ['pickup', 'customers_shipping_account', 'suppliers_shipping_account']
+            shipping_method:
+              type: string
+              enum: ['early_am_overnight', 'next_day_air', 'second_day_air', 'ground']
+            ship_when:
+              type: string
+              enum: ['when_ready', 'all_at_once']
+    Contact:
+      type: object
+      properties:
+        address:
+          $ref: '#/components/schemas/Address'
+        account_id:
+          type: integer
+          example: 17
+          nullable: true
+          description: The ID of the associated account
+        created:
+          type: string
+          readOnly: true
+          example: "2020-08-25T18:00:53+00:00"
+        email:
+          type: string
+          nullable: false
+          example: careers@paperlessparts.com
+          description: (Required) email address (must be non-null, unique across all Customers, and a valid email format)
+        first_name:
+          type: string
+          example: Gordon
+          nullable: false
+          description: (Required) Customer first name (must be non-null)
+        id:
+          type: integer
+          example: 137
+          readOnly: true
+          nullable: false
+        last_name:
+          type: string
+          nullable: false
+          example: Moore
+          description: (Required) Customer last name (must be non-null)
+        notes:
+          type: string
+          nullable: true
+          description: Customer notes
+        phone:
+          type: string
+          nullable: true
+          example: "6176354500"
+          description: Customer phone number
+        phone_ext:
+          type: string
+          nullable: true
+          example: null
+          description: Customer phone number extension
+        salesperson:
+          $ref: '#/components/schemas/SalesPerson'
+    Account:
+      type: object
+      properties:
+        billing_address:
+          type: array
+          items:
+            $ref: '#/components/schemas/Address'
+        name:
+          type: string
+          nullable: false
+          example: Paperless Parts, Inc.
+          description: (Required) The name of the account
+        created:
+          type: string
+          readOnly: true
+          example: "2020-08-25T18:00:53+00:00"
+        credit_line:
+          type: number
+          nullable: true
+          description: credit line (dollars)
+          example: 10000.00
+        erp_code:
+          type: string
+          nullable: true
+          example: PPI
+          description: The ERP code of the account
+        id:
+          type: integer
+          readOnly: true
+          example: 17
+          description: the ID of the account
+        notes:
+          type: string
+          nullable: true
+          description: Account notes
+        payment_terms:
+          type: string
+          nullable: true
+          example: Net 30
+          description: Payment terms; required if `payment_terms_period` are included
+        payment_terms_period:
+          type: integer
+          nullable: true
+          example: 30
+          description: Payment terms period in days; required if `payment_terms` are included, but can be `null`
+        phone:
+          type: string
+          nullable: true
+          example: "6176354500"
+          description: Account phone number
+        phone_ext:
+          type: string
+          nullable: true
+          example: null
+          description: Account phone number extension
+        purchase_orders_enabled:
+          type: boolean
+          nullable: false
+          example: true
+          description: When `true` this account can check out with a purchase order
+        salesperson:
+          $ref: '#/components/schemas/SalesPerson'
+        sold_to_address:
+          $ref: '#/components/schemas/Address'
+        tax_exempt:
+          type: boolean
+          nullable: false
+          example: true
+          description: When `true`, sales tax will not be added to a quote
+        tax_rate:
+          type: number
+          nullable: true
+          example: 6.25
+          description: Sales tax rate for this account
+        type:
+          type: string
+          nullable: false
+          example: customer
+          description: Type of account, either customer or vendor
+        url:
+          type: string
+          nullable: true
+          example: https://www.paperlessparts.com
+
+    Address:
+      type: object
+      properties:
+        address1:
+          type: string
+          maxLength: 250
+          nullable: false
+          example: 1 City Hall Sq.
+          description: (Required)
+        address2:
+          type: string
+          maxLength: 250
+          nullable: true
+          example: null
+          description: (Required)
+        city:
+          type: string
+          maxLength: 100
+          nullable: false
+          example: Boston
+          description: (Required)
+        state:
+          type: string
+          nullable: false
+          description: "(Required) State/Province must be specified as standard postal abbreviation"
+          example: MA
+        postal_code:
+          type: string
+          nullable: false
+          example: "02114"
+          description: "(Required) US postal codes may optionally contain 4-digit extension, e.g., `'02114-1234'`"
+        country:
+          type: string
+          maxLength: 3
+          nullable: false
+          description: "(Required) Country must be ISO 3166-1 alpha-3 code. Currently allowed values are `'USA'`, `'CAN'`."
+          example: USA
+        erp_code:
+          type: string
+          maxLength: 50
+          description: The unique identifier for this address record in the ERP
+          example: B1234
+
+    AddressBody:
+      type: object
+      properties:
+        first_name:
+          type: string
+          maxLength: 100
+          nullable: true
+          example: Gordon
+        last_name:
+          type: string
+          maxLength: 100
+          nullable: true
+          example: Moore
+        phone:
+          type: string
+          maxLength: 10
+          nullable: true
+          example: "6176354500"
+        phone_ext:
+          type: string
+          maxLength: 10
+          nullable: true
+          example: null
+        business_name:
+          type: string
+          maxLength: 100
+          nullable: true
+          example: "Paperless Parts Inc."
+        address1:
+          type: string
+          maxLength: 250
+          nullable: false
+          example: 1 City Hall Sq.
+          description: (Required)
+        address2:
+          type: string
+          maxLength: 250
+          nullable: true
+          example: null
+          description: (Required)
+        city:
+          type: string
+          maxLength: 100
+          nullable: false
+          example: Boston
+          description: (Required)
+        state:
+          type: string
+          nullable: false
+          description: "(Required) State/Province must be specified as standard postal abbreviation"
+          example: MA
+        postal_code:
+          type: string
+          nullable: false
+          example: "02114"
+          description: "(Required) US postal codes may optionally contain 4-digit extension, e.g., `'02114-1234'`"
+        country:
+          type: string
+          maxLength: 3
+          nullable: false
+          description: "(Required) Country must be ISO 3166-1 alpha-3 code. Currently allowed values are `'USA'`, `'CAN'`."
+          example: USA
+    CustomTableListResults:
+      type: array
+      items:
+        type: string
+    CustomTableName:
+      type: object
+      properties:
+        name:
+          type: string
+    CustomTableRelatedEntity:
+      type: object
+      properties:
+        entity_type:
+          type: string
+          enum: ['operation', 'process']
+        name:
+          type: string
+    CustomTableColumnConfig:
+      type: object
+      properties:
+        column_name:
+          type: string
+        value_type:
+          type: string
+          enum: ['numeric', 'string', 'boolean']
+          #is_for_unique_key:
+          #type: boolean
+          #required: false
+          #description: Indicates whether this column is part of the unique key for this table.
+    CustomTableRowData:
+      type: object
+      description: The keys in this object must match the column names in the config property above, and the corresponding values must be castable to the specified types in the config property.
+
+
+    CustomTableDetails:
+      type: object
+      properties:
+        columns:
+          type: array
+          items:
+            type: string
+        name:
+          type: string
+        related_entities:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomTableRelatedEntity'
+        rows:
+          type: array
+          items:
+            type: object
+            description: The keys in this object will match the column names in the columns property above.
+    CustomTableBody:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        config:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/CustomTableColumnConfig'
+        data:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/CustomTableRowData'
+
+    PurchasedComponentsColumnId:
+      type: integer
+    PurchasedComponentId:
+      type: integer
+    AbstractPurchasedComponentsColumn:
+      type: object
+      properties:
+        code_name:
+          type: string
+          example: James_Bond
+        name:
+          type: string
+          example: James Bond
+        value_type:
+          type: string
+          example: numeric
+        default_numeric_value:
+          type: integer
+          nullable: true
+          example: 21
+        default_string_value:
+          type: string
+          nullable: true
+          example: null
+        default_boolean_value:
+          type: boolean
+          example: false
+    PostPurchasedComponentsColumn:
+      allOf:
+        - $ref: '#/components/schemas/AbstractPurchasedComponentsColumn'
+        - type: object
+          required:
+            - code_name
+            - name
+            - value_type
+            - default_numeric_value
+            - default_string_value
+            - default_boolean_value
+    PatchPurchasedComponentsColumn:
+      allOf:
+        - $ref: '#/components/schemas/AbstractPurchasedComponentsColumn'
+        - type: object
+          properties:
+            update_existing_defaults:
+              type: boolean
+            position:
+              type: integer
+              example: 4
+    PurchasedComponentsColumn:
+      allOf:
+        - $ref: '#/components/schemas/AbstractPurchasedComponentsColumn'
+        - type: object
+          properties:
+            id:
+              type: integer
+              readOnly: true
+              example: 25
+            position:
+              type: integer
+              example: 4
+              description: Position of the column when displayed in the table; starts at 1.

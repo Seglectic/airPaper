@@ -10,8 +10,6 @@
 			const https       = require('https');             // Allows get requests to paperless API
 			const Airtable    = require('airtable');          // Airtable API library
 			const moment      = require('moment');            // Formatted time stamps
-			const request     = require('request');           // Make http requests for thumbnail data
-			const gunzip      = require('gunzip-file');       // Extractor for gzip'd thumbnails
 			
 // ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 // │                                                    Global Vars                                                    │
@@ -22,9 +20,6 @@
 			var activeBase     = "Work Orders";       				// Uncomment for Production: "Work Orders"
 			// var activeBase     = "Paperless Work Orders";  // Uncomment for Testing:    "Paperless Work Orders"
 			var debug          = false;                       // Freeze latestWO
-			var httPort        = 8085;                        // Port to host HTTP server from
-			var getURL         = 'http://108.189.198.147'     // Local external IP for airtable to request web data
-			var serveDir       = './imgServe'                 // Local directory to host images
 			
 // ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 // │                                            Airtable & Paperless Config                                            │
@@ -53,31 +48,6 @@
 				console.error("Airtable key not found! './airtableKey'")
 				return;
 			}
-			
-	// ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-	// │                                                  Express Server                                                   │
-	// └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-			// ╭───────────────────────────────────────────────────────────╮
-			// │  Begin Express server for hosting image files.            │
-			// │    (Required for thumbnails to be sent to to Airtable)    │
-			// │    Port httPort MUST be forwarded for Airtables' access.  │
-			// │    Upon failure, resulting image will be blank.           │
-			// ╰───────────────────────────────────────────────────────────╯
-			const express = require('express');
-			var app = express();
-			app.use(express.static(__dirname + 	'/'));
-			
-			// Define the route for serving files
-			app.get('imgServe/:fileName', (req, res) => {
-				const fileName = req.params.fileName;
-				const filePath = path.join(__dirname, fileName);
-				res.sendFile(filePath, (err) => {
-					if (err) {
-						console.error(`Error sending file: ${err}`);
-						res.status(err.status || 500).end();
-					}
-				});
-			});
 			
 	// ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 	// │                                                Shorthand Functions                                                │
@@ -116,21 +86,6 @@
 				}).on('error', (e) => {console.error(`HTTP Error: ${e.message}`);});
 			}
 					
-			// ╭─────────────────────────────╮
-			// │  imgDownload                │
-			// │  Downloads image at URL     │
-			// │  to path and runs callback  │
-			// │  upon completion            │
-			// ╰─────────────────────────────╯
-			function imgDownload(url, path, callback){
-				request.head(url, (err, res, body) => {
-						request(url)
-						.pipe(fs.createWriteStream(path))
-						.on('close', ()=>{gunzip(path, path+'.png', ()=>{fs.unlinkSync(path), setTimeout( ()=>{callback} ,2000)} )})
-				})
-			}
-			
-			
 	// ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 	// │                                                airPaper Callbacks                                                 │
 	// └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -220,23 +175,7 @@
 					WObject.fields["Material"]     = comp.material.name ? comp.material.name : ""; 					  
 					WObject.fields["PP Part Link"] = `https://app.paperlessparts.com/parts/viewer/${comp.part_uuid}`; 
 					WObject.fields["STEP File"]    = comp.part_url;
-					let thumbURL=comp.thumbnail_url;   																											  // Grab the Thumbnail URL from Paperless
-					let ITAR = orderItem.export_controlled  																									// Send to Airtable if not export controlled (ITAR is a boolean)
-					if (!ITAR){																																							  // Grab the pic and send it if it's not ITAR-y
-						if (thumbURL){																																		    	// If the part in the order has an attached pic
-							let fileName = WObject.fields["Part"].replace(/[ &\/\\#,+()$~%.'":*?<>{}]/g, '')      // Purge weird shit from the part name
-							let localThumbURL = `${getURL}:${httPort}/imgServe/${fileName}.png`;                  // Assemble the URL for where the image file is hosted locally
-							WObject.fields["Picture"].push({url:localThumbURL});                                  // Pushes an object to the Picture array with our local image address
-							imgDownload(thumbURL,'./imgServe/'+fileName,sendAirtableObject(WObject));					    // Download the image and send the object to Airtable once it completes
-							// imgDownload(thumbURL,'./imgServe/'+fileName); 																	    // For debug: only download the image, don't send to Airtable
-						}else{
-							sendAirtableObject(WObject);																												  // Send it without a pic if we don't have one
-						}
-					}else{ 																																			 							// If we've got an ITAR part
-						let ITARURL = `${getURL}:${httPort}/imgServe/ITAR.png`; 									 							// grab our local ITAR pic URL
-						WObject.fields["Picture"].push({url:ITARURL});                                    			// and attach the ITAR png to the object to send
-						sendAirtableObject(WObject);																							 							// then send the object per usual
-					}; // End ITAR check	
+					sendAirtableObject(WObject);
 				}); //End for loop of each order
 			}; //End createWO()
 			//!SECTION 
@@ -260,6 +199,5 @@
 	// │                                                      Execute                                                      │
 	// └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 			timePrint(`AirPaper ${Version}`)																													// Print startup time
-			app.listen(httPort,function(){timePrint(`Server started on port ${httPort}.`);});         // Launch the webserver for hosting image files
 			getNewWOs();															  																							// Check now for any new Work ORders
 			setInterval(getNewWOs,updateInterval) 																										// Check again every x ms`
