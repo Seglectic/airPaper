@@ -162,7 +162,7 @@
 							"Due Date": paperData.ships_on, 																										// Use the 'ships_on' date as the due date
 																																																  // If the customer has a company, use it, otherwise use their name:
 							"Client": paperData.customer.company ? paperData.customer.company.business_name : `${paperData.customer.first_name} ${paperData.customer.last_name}`,  
-							"Purchase Orders": paperData.payment_details.purchase_order_number,                 // Add the PO number to the 'Purchase Orders' field
+							"Purchase Order": paperData.payment_details.purchase_order_number,                  // Add the PO number to the 'Purchase Order' field
 							"Notes": paperData.private_notes, 																								  // Add private notes to the 'Notes' field
 							"Stock Status":'Not Yet Ordered',                                 									// Default to 'Not Yet Ordered' for stock status
 							"Tooling Status": 'Not Yet Ordered',                              									// Default to 'Not Yet Ordered' for tooling status
