@@ -6,7 +6,7 @@
   "dependencies": {
     "airtable": "^0.8.1",
     "dotenv": "^17.4.2",
-    "follow-redirects": "^1.13.2",
+    "follow-redirects": "^1.16.0",
     "moment": "*"
   },
   "scripts": {
