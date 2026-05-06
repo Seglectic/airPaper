@@ -8,6 +8,28 @@ Polls [Paperless Parts](https://www.paperlessparts.com/) for accepted orders and
 
 ## How it works
 
+```mermaid
+flowchart TD
+    A([Poll interval fires]) --> B[Fetch orders from Paperless Parts\nnewer than last cursor]
+    B --> C{New orders?}
+    C -- No --> Z([Wait for next interval])
+    C -- Yes --> D[For each order item]
+    D --> E{Already processed?\ncheck state.json}
+    E -- Yes --> D
+    E -- No --> F[Map fields & create\nAirtable record]
+    F --> G{ITAR flagged?}
+    G -- Yes --> H[Upload local\nplaceholder image]
+    G -- No --> I[Fetch thumbnail\nfrom Paperless]
+    I --> J[Upload thumbnail\nto Picture field]
+    H --> J
+    J --> K{XOMETRY_API_TOKEN set\n& customer matches?}
+    K -- No --> L[Mark item processed\nin state.json]
+    K -- Yes --> M[Resolve Xometry job\nvia erp_code]
+    M --> N[Upload traveler &\nredacted drawings\nto Part Documents]
+    N --> L
+    L --> D
+```
+
 1. On a configurable interval, airPaper calls the Paperless Parts API for orders newer than the last seen cursor.
 2. Each `order_item` in a new order becomes one Airtable record with mapped fields (part name, client, PO, due date, material, finish, etc.).
 3. A thumbnail is fetched from Paperless and uploaded to the `Picture` field. ITAR-flagged parts get a local placeholder image instead.
