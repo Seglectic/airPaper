@@ -324,9 +324,9 @@ function createWO(paperData) {
     // Airtable creates the record first; the direct attachment API uploads the image afterward using that record ID.
     let attachment = null;
     let ITAR = orderItem.export_controlled;
-    if (ITAR && fs.existsSync('./imgServe/ITAR.png')) {
+    if (ITAR && fs.existsSync('./assets/ITAR.png')) {
       attachment = {
-        "path": "./imgServe/ITAR.png",
+        "path": "./assets/ITAR.png",
         "filename": "ITAR.png",
         "contentType": "image/png",
       }

@@ -1,17 +1,14 @@
 {
   "name": "airpaper",
-  "version": "1.0.0",
-  "description": "Grab data from Paperless Parts and import into Airtable spreadsheet for use at P3DCreations",
-  "main": "airPaper.js",
+  "version": "2.0.0",
+  "description": "Polls Paperless Parts for accepted orders and imports them into Airtable; enriches Xometry orders with job files.",
+  "main": "index.js",
   "dependencies": {
-    "airtable": "^0.8.1",
-    "dotenv": "^17.4.2",
-    "follow-redirects": "^1.13.2",
-    "moment": "*"
+    "dotenv": "*"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node airPaper.js"
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
   "license": "ISC"
